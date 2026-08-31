@@ -158,7 +158,18 @@ export default function Home() {
     if (saved) return saved;
     return { code: "RAUL08", name: "Casa do Raul", table: "08" };
   });
-  useEffect(() => { persistVenue(window.localStorage, venue); }, [venue]);
+  useEffect(() => {
+    persistVenue(window.localStorage, venue);
+    const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("tocaraul-venue") : null;
+    channel?.postMessage(venue);
+    return () => channel?.close();
+  }, [venue]);
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel("tocaraul-venue");
+    channel.onmessage = (event) => { if (event.data?.code && event.data?.name && event.data?.table) setVenue(event.data as Venue); };
+    return () => channel.close();
+  }, []);
   useEffect(() => {
     const access = parseVenueAccess(window.location.pathname, window.location.search, venue.table);
     const resolved = access ? resolveVenue(access.code, access.table) : null;
