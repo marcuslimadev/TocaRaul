@@ -13,9 +13,13 @@ export function verifyWebhookSignature(payload: string, signature: string, secre
   return left.length === right.length && timingSafeEqual(left, right);
 }
 export class MockPaymentProvider implements PaymentProvider {
-  async createPayment(order: PaymentOrder): Promise<PaymentResult> { return { externalId: `mock_${order.requestId}`, status: "PENDING", pixCopyPaste: `000201MOCKTOCARAUL${order.amountCents}` }; }
-  async getPayment(_externalId: string): Promise<PaymentStatus> { return "PENDING"; }
+  private readonly payments = new Map<string, PaymentStatus>();
+  async createPayment(order: PaymentOrder): Promise<PaymentResult> { const externalId = `mock_${order.requestId}`; this.payments.set(externalId, "PENDING"); return { externalId, status: "PENDING", pixCopyPaste: `000201MOCKTOCARAUL${order.amountCents}` }; }
+  async getPayment(externalId: string): Promise<PaymentStatus> { return this.payments.get(externalId) ?? "PENDING"; }
+  async approvePayment(externalId: string) { this.payments.set(externalId, "APPROVED"); return this.getPayment(externalId); }
 }
+
+export const mockPaymentProvider = new MockPaymentProvider();
 
 export class MercadoPagoPaymentProvider implements PaymentProvider {
   async createPayment(_order: PaymentOrder): Promise<PaymentResult> { throw new Error("Mercado Pago credentials are required before creating Pix payments"); }

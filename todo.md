@@ -71,9 +71,9 @@
 - [ ] Conectar a confirmação mockada da UI ao backend e refletir a fila nas jornadas
 - [ ] Testar o ciclo completo create AWAITING_PAYMENT → mockConfirm → QUEUED
 
-- [ ] Fazer payments.mockStatus consultar efetivamente MockPaymentProvider.getPayment
-- [ ] Retornar também o status do pedido na consulta mockada
-- [ ] Testar a procedure de status mockado e o uso efetivo do provider
+- [x] Fazer payments.mockStatus consultar efetivamente MockPaymentProvider.getPayment
+- [x] Retornar também o status do pedido na consulta mockada
+- [x] Testar a procedure de status mockado e o uso efetivo do provider
 
 - [x] Incorporar a referência visual da tela Pix ao modal de solicitação e confirmação do cliente
 - [x] Reforçar hierarquia de QR Code, resumo de valores e estado “Aguardando pagamento” sem sugerir pagamento real
@@ -108,3 +108,10 @@
 
 - [ ] Criar estado demonstrativo para abrir diretamente o modal de solicitação por URL
 - [ ] Capturar screenshot do modal de solicitação com resumo de valores antes do Pix
+
+- [x] Fazer payments.mockStatus consultar o provider também no caminho de requests em memória
+- [x] Adicionar teste de payments.mockStatus cobrindo status do provider e status do pedido
+- [x] Adicionar teste do ciclo mockCreate → mockStatus pendente → mockConfirm → mockStatus aprovado/QUEUED
+
+- [x] Adicionar teste específico que diferencie a fonte de verdade do provider do estado em memória
+- [x] Expor uma seam testável para observar a consulta do MockPaymentProvider no status do pedido
