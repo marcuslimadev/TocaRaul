@@ -74,3 +74,37 @@
 - [ ] Fazer payments.mockStatus consultar efetivamente MockPaymentProvider.getPayment
 - [ ] Retornar também o status do pedido na consulta mockada
 - [ ] Testar a procedure de status mockado e o uso efetivo do provider
+
+- [x] Incorporar a referência visual da tela Pix ao modal de solicitação e confirmação do cliente
+- [x] Reforçar hierarquia de QR Code, resumo de valores e estado “Aguardando pagamento” sem sugerir pagamento real
+- [x] Revalidar visualmente cliente, painel e TV após o refinamento
+
+- [x] Refinar também o modal de solicitação do cliente com o padrão visual Pix da referência
+- [x] Ajustar e validar visualmente o resumo de valores junto do QR Code e estado de pagamento
+- [x] Executar validação visual explícita do painel e da tela de TV após o refinamento
+
+- [x] Adaptar a tela principal do cliente para a referência mobile-first com cards, CTA amarelo e navegação inferior
+- [x] Adicionar ações visuais de categoria e dedicatória sem alterar a regra de pagamento mockado
+- [x] Validar a tela principal em viewport móvel após o refinamento
+
+- [x] Garantir que a experiência do cliente seja apresentada e validada como site web responsivo, sem dependência de aplicativo nativo
+- [x] Remover ou evitar qualquer linguagem de instalação de app na jornada web do cliente
+
+- [x] Priorizar o QR Code fixado na mesa como entrada principal do site, resolvendo bar e mesa automaticamente
+- [x] Manter o código digitável apenas como alternativa de contingência
+- [x] Validar uma URL de QR Code específica por mesa e a identificação exibida no site
+
+- [x] Refinar a jornada do cliente para abrir já contextualizada por QR Code de mesa como fluxo principal
+- [x] Ajustar a copy e a hierarquia visual do acesso manual para deixá-lo explicitamente como contingência
+- [x] Adicionar teste ou validação visual específica da abertura por URL de mesa mostrando bar e mesa automaticamente
+
+- [x] Implementar na tela principal do cliente a navegação inferior e CTA amarelo por música conforme a referência mobile-first
+- [x] Adicionar ações visuais de categoria na listagem do cliente e manter a dedicatória conectada ao fluxo mockado
+- [x] Registrar validação visual explícita da tela principal refinada mostrando cards, CTA e navegação inferior
+
+- [x] Validar visualmente o modal de solicitação e a confirmação Pix com resumo, QR Code e estado aguardando
+- [x] Executar validação visual específica do painel após o refinamento
+- [x] Executar validação visual específica da tela de TV após o refinamento
+
+- [ ] Criar estado demonstrativo para abrir diretamente o modal de solicitação por URL
+- [ ] Capturar screenshot do modal de solicitação com resumo de valores antes do Pix
