@@ -59,3 +59,18 @@
 - [x] Validar explicitamente status approved no payload do webhook antes de promover para QUEUED
 - [x] Testar rejeição de webhook assinado com status diferente de approved e ausência de atualização
 - [x] Manter aberta a confirmação por provider real até configurar credenciais de produção
+
+- [x] Manter o provedor Mercado Pago mockado no MVP, sem solicitar credenciais reais
+- [x] Validar que o fluxo mockado não libera a fila sem confirmação explícita de pagamento
+
+- [x] Integrar o MockPaymentProvider ao fluxo de criação e consulta de pagamentos do MVP
+- [x] Conectar a confirmação mockada ao estado da fila e bloquear QUEUED antes da confirmação
+- [x] Testar o ciclo mockado pendente → confirmado → QUEUED
+
+- [x] Adicionar procedure de consulta de pagamento/status do pedido usando o MockPaymentProvider
+- [ ] Conectar a confirmação mockada da UI ao backend e refletir a fila nas jornadas
+- [ ] Testar o ciclo completo create AWAITING_PAYMENT → mockConfirm → QUEUED
+
+- [ ] Fazer payments.mockStatus consultar efetivamente MockPaymentProvider.getPayment
+- [ ] Retornar também o status do pedido na consulta mockada
+- [ ] Testar a procedure de status mockado e o uso efetivo do provider

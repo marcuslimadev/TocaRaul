@@ -12,6 +12,11 @@ export function verifyWebhookSignature(payload: string, signature: string, secre
   const left = Buffer.from(expected, "utf8"); const right = Buffer.from(signature, "utf8");
   return left.length === right.length && timingSafeEqual(left, right);
 }
+export class MockPaymentProvider implements PaymentProvider {
+  async createPayment(order: PaymentOrder): Promise<PaymentResult> { return { externalId: `mock_${order.requestId}`, status: "PENDING", pixCopyPaste: `000201MOCKTOCARAUL${order.amountCents}` }; }
+  async getPayment(_externalId: string): Promise<PaymentStatus> { return "PENDING"; }
+}
+
 export class MercadoPagoPaymentProvider implements PaymentProvider {
   async createPayment(_order: PaymentOrder): Promise<PaymentResult> { throw new Error("Mercado Pago credentials are required before creating Pix payments"); }
   async getPayment(_externalId: string): Promise<PaymentStatus> { throw new Error("Mercado Pago credentials are required before querying payments"); }
