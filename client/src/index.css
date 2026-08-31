@@ -58,3 +58,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline:2px 
 .song-dedication { grid-column: 1 / -1; width: fit-content; display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; color: #d5d0dc; background: transparent; font-size: .7rem; cursor: pointer; }
 .mobile-bottom-nav { display: none; }
 @media (max-width: 620px) { .client-content { padding-bottom: 76px; } .song-card { grid-template-columns: minmax(0,1fr) auto; } .song-card-main { grid-column: 1 / -1; } .song-ask { grid-column: 1; grid-row: 2; justify-self: start; padding: 9px 14px; } .song-dedication { grid-column: 2; grid-row: 2; justify-self: end; align-self: center; } .mobile-bottom-nav { position: fixed; z-index: 20; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(4,1fr); padding: 8px 8px max(8px, env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,.12); background: rgba(18,16,21,.96); backdrop-filter: blur(14px); } .mobile-bottom-nav button { display: grid; justify-items: center; gap: 3px; border: 0; color: #97919e; background: transparent; font-size: .64rem; cursor: pointer; } .mobile-bottom-nav button.active { color: #ffd12f; } }
+
+.print-page { min-height: 100vh; display: grid; place-items: center; align-content: center; gap: 18px; padding: 40px 24px; color: #f7f4f8; background: #0e0d10; text-align: center; }
+.print-page .brand-lockup { margin-bottom: 8px; }
+.print-venue { padding: 9px 16px; border: 1px solid rgba(255,209,47,.45); border-radius: 999px; color: #ffd12f; font-weight: 700; }
+.print-page .real-qr { width: min(320px, 75vw); height: auto; padding: 12px; border-radius: 16px; background: #fff; }
+.print-page h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.6rem); }
+.print-page p { max-width: 420px; margin: 0; color: #aaa4b1; }
+.print-page strong { color: #ffd12f; font-size: .88rem; }
+.print-action { margin-top: 12px; }
+@media print { .print-page { min-height: auto; padding: 16mm; color: #111; background: #fff; } .print-page .brand-lockup { color: #111; } .print-page .brand-lockup span, .print-page p { color: #444; } .print-venue { border-color: #111; color: #111; } .print-page strong { color: #111; } .print-action { display: none; } }

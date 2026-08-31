@@ -10,11 +10,21 @@ export function persistVenue(storage: StorageLike, venue: Venue) {
   storage.setItem(venueStorageKey, JSON.stringify(venue));
 }
 
+export function parsePrintAccess(pathname: string, search: string, fallbackTable = "01") {
+  const code = pathname.match(/\/(?:print|join)\/([^/]+)/)?.[1] ?? "";
+  const table = new URLSearchParams(search).get("table") || fallbackTable;
+  return code ? { code, table } : null;
+}
+
 export function parseVenueAccess(pathname: string, search: string, fallbackTable = "01") {
   const params = new URLSearchParams(search);
   const code = params.get("room") || pathname.match(/\/join\/([^/]+)/)?.[1];
   const table = params.get("table") || fallbackTable;
   return code ? { code, table } : null;
+}
+
+export function venueJoinUrl(venue: Venue, baseUrl = "https://tocaraul.app") {
+  return `${baseUrl}/join/${venue.code.toLowerCase()}?table=${venue.table}`;
 }
 
 export function resolveVenue(code: string, table: string): Venue | null {

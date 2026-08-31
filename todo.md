@@ -106,8 +106,8 @@
 - [x] Executar validação visual específica do painel após o refinamento
 - [x] Executar validação visual específica da tela de TV após o refinamento
 
-- [ ] Criar estado demonstrativo para abrir diretamente o modal de solicitação por URL
-- [ ] Capturar screenshot do modal de solicitação com resumo de valores antes do Pix
+- [x] Criar estado demonstrativo para abrir diretamente o modal de solicitação por URL
+- [x] Capturar screenshot do modal de solicitação com resumo de valores antes do Pix
 
 - [x] Fazer payments.mockStatus consultar o provider também no caminho de requests em memória
 - [x] Adicionar teste de payments.mockStatus cobrindo status do provider e status do pedido
@@ -119,3 +119,23 @@
 - [ ] Conectar cliente, painel e TV aos dados de fila via tRPC em vez de depender apenas dos dados estáticos
 - [ ] Atualizar a confirmação mockada para consultar/invalidate a fila após mockConfirm
 - [ ] Adicionar teste de integração da fila compartilhada após confirmação do pedido
+
+- [x] Gerar QR Code real a partir da URL contextualizada de cada mesa para uso físico no bar
+- [x] Exibir o QR Code real na tela da TV e disponibilizar uma visualização adequada para impressão
+
+- [x] Criar visualização de impressão por mesa com QR Code real, nome do bar, mesa e URL contextualizada
+- [x] Adicionar ação explícita de imprimir o QR Code no painel ou TV
+- [x] Validar visualmente a tela de TV com o QR Code real renderizado
+
+- [x] Corrigir a tela /print/:code para ler o código da rota e gerar QR contextualizado para qualquer bar e mesa
+- [x] Adicionar teste da resolução correta do código e mesa na visualização de impressão
+- [x] Adicionar no painel ou TV uma ação explícita para abrir/imprimir o QR Code da mesa
+
+- [x] Extrair o parser da rota /print/:code para helper compartilhado testável
+- [x] Adicionar teste automatizado cobrindo código da rota, mesa da query e URL contextualizada
+
+- [x] Extrair helper para montar a URL final do QR Code da mesa
+- [x] Testar a URL contextualizada completa no fluxo de impressão
+
+- [x] Adicionar teste automatizado para venueJoinUrl com código e mesa normalizados
+- [x] Cobrir em teste a composição completa de rota de impressão, mesa e URL final do QR Code
