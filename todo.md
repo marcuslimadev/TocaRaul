@@ -68,8 +68,8 @@
 - [x] Testar o ciclo mockado pendente → confirmado → QUEUED
 
 - [x] Adicionar procedure de consulta de pagamento/status do pedido usando o MockPaymentProvider
-- [ ] Conectar a confirmação mockada da UI ao backend e refletir a fila nas jornadas
-- [ ] Testar o ciclo completo create AWAITING_PAYMENT → mockConfirm → QUEUED
+- [x] Conectar a confirmação mockada da UI ao backend e refletir a fila nas jornadas
+- [x] Testar o ciclo completo create AWAITING_PAYMENT → mockConfirm → QUEUED
 
 - [x] Fazer payments.mockStatus consultar efetivamente MockPaymentProvider.getPayment
 - [x] Retornar também o status do pedido na consulta mockada
@@ -115,3 +115,7 @@
 
 - [x] Adicionar teste específico que diferencie a fonte de verdade do provider do estado em memória
 - [x] Expor uma seam testável para observar a consulta do MockPaymentProvider no status do pedido
+
+- [ ] Conectar cliente, painel e TV aos dados de fila via tRPC em vez de depender apenas dos dados estáticos
+- [ ] Atualizar a confirmação mockada para consultar/invalidate a fila após mockConfirm
+- [ ] Adicionar teste de integração da fila compartilhada após confirmação do pedido
