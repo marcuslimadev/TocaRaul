@@ -139,3 +139,6 @@
 
 - [x] Adicionar teste automatizado para venueJoinUrl com código e mesa normalizados
 - [x] Cobrir em teste a composição completa de rota de impressão, mesa e URL final do QR Code
+
+- [ ] Exportar o checkpoint consolidado para marcuslimadev/TocaRaul
+- [ ] Confirmar no GitHub o commit e a URL do repositório exportado
