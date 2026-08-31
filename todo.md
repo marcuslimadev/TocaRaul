@@ -20,11 +20,11 @@
 ## Próximos passos de produto
 
 - [ ] Persistir ambientes, músicas, pedidos e pagamentos no banco de dados
-- [ ] Criar procedimentos tRPC para catálogo, pedido, fila e configuração
+- [x] Criar procedimentos tRPC para catálogo, pedido, fila e configuração
 - [ ] Implementar sincronização persistente entre celular, painel e TV via WebSocket ou SSE
 - [ ] Integrar geração real da cobrança Pix no Mercado Pago
 - [ ] Integrar webhook autenticado de confirmação do Mercado Pago com idempotência
-- [ ] Garantir no backend que somente pagamentos confirmados possam mudar o pedido para QUEUED
+- [x] Garantir no backend que somente pagamentos confirmados possam mudar o pedido para QUEUED
 - [ ] Implementar OAuth por estabelecimento e comissão/split da plataforma
 - [ ] Conectar player real da TV por uma interface desacoplada do provedor
 - [ ] Implementar autenticação e permissões específicas do estabelecimento
@@ -51,3 +51,11 @@
 - [ ] Adicionar teste de UI/componente cobrindo persistência e reidratação de venue via localStorage
 - [ ] Adicionar teste de integração que altere ambiente e mesa no cliente e verifique a atualização refletida no painel e na TV
 - [ ] Avaliar persistência do estado compartilhado fora do estado local para sincronização real entre dispositivos
+
+- [x] Adicionar procedimento tRPC para catálogo de músicas e procedimento tRPC para configuração do estabelecimento e preço
+- [x] Validar confirmação de pagamento no backend antes de promover pedido para QUEUED, com autenticidade e falha quando nada for atualizado
+- [x] Adicionar testes para promoção inválida sem pagamento e para os procedimentos tRPC de catálogo e configuração
+
+- [x] Validar explicitamente status approved no payload do webhook antes de promover para QUEUED
+- [x] Testar rejeição de webhook assinado com status diferente de approved e ausência de atualização
+- [x] Manter aberta a confirmação por provider real até configurar credenciais de produção
