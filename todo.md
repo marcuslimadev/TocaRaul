@@ -140,5 +140,23 @@
 - [x] Adicionar teste automatizado para venueJoinUrl com código e mesa normalizados
 - [x] Cobrir em teste a composição completa de rota de impressão, mesa e URL final do QR Code
 
-- [ ] Exportar o checkpoint consolidado para marcuslimadev/TocaRaul
-- [ ] Confirmar no GitHub o commit e a URL do repositório exportado
+- [x] Exportar o checkpoint consolidado para marcuslimadev/TocaRaul
+- [x] Confirmar no GitHub o commit e a URL do repositório exportado
+
+- [ ] Definir modelo de recebimento do TocaRaul sem split automático no provedor
+- [ ] Documentar responsabilidades de conciliação, repasse e reembolso no modelo escolhido
+
+- [ ] Comparar provedores alternativos ao Mercado Pago para Pix com split
+- [ ] Avaliar webhooks, onboarding/KYC, repasses, estornos e disponibilidade de API
+- [ ] Registrar recomendação de provedor e arquitetura de integração sem ativar credenciais ainda
+
+- [ ] Exigir onboarding de estabelecimento iniciado e concluído pelo próprio TocaRaul via API
+- [ ] Comparar criação de subconta/recebedor, KYC, links de onboarding e webhooks de aprovação
+- [ ] Confirmar quais provedores permitem split Pix sem cadastro manual no painel externo
+
+- [ ] Preparar integração Pagar.me em sandbox mantendo o MockPaymentProvider como fallback
+- [ ] Configurar credenciais Pagar.me com armazenamento seguro, sem gravar chaves no código
+- [ ] Validar recebedor de teste, KYC, Pix, split e webhook antes de ativar o provider real
+
+- [ ] Sincronizar as alterações mais recentes do TocaRaul com marcuslimadev/TocaRaul
+- [ ] Confirmar o commit remoto atualizado no GitHub
