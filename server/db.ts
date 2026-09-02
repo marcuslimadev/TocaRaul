@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, payments, songRequests, users, venues } from "../drizzle/schema";
+import { devices, InsertUser, payments, songRequests, users, venues, venueTables } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -26,5 +26,53 @@ export async function getPaymentByRequestId(requestId: number) { const db = awai
 export async function getRequestById(requestId: number) { const db = await getDb(); if (!db) return undefined; const rows = await db.select().from(songRequests).where(eq(songRequests.id, requestId)).limit(1); return rows[0]; }
 export async function markRequestQueuedAfterApprovedPayment(requestId: number, externalId: string) { const db = await getDb(); if (!db) throw new Error("Database unavailable"); const paymentUpdate = await db.update(payments).set({ status: "APPROVED", externalId }).where(and(eq(payments.requestId, requestId), eq(payments.status, "PENDING"))); if (!paymentUpdate[0] || Number(paymentUpdate[0].affectedRows) !== 1) return false; const requestUpdate = await db.update(songRequests).set({ status: "QUEUED" }).where(and(eq(songRequests.id, requestId), eq(songRequests.status, "AWAITING_PAYMENT"))); return Boolean(requestUpdate[0] && Number(requestUpdate[0].affectedRows) === 1); }
 export async function updateVenuePricing(venueId: number, musicPriceCents: number, dedicationPriceCents: number) { const db = await getDb(); if (!db) throw new Error("Database unavailable"); await db.update(venues).set({ musicPriceCents, dedicationPriceCents }).where(eq(venues.id, venueId)); return getVenueById(venueId); }
+export async function updateVenuePagarmeOnboarding(venueId: number, onboarding: { recipientId: string; recipientStatus: string; kycUrl?: string; kycExpiresAt?: Date }) { const db = await getDb(); if (!db) throw new Error("Database unavailable"); await db.update(venues).set({ pagarmeRecipientId: onboarding.recipientId, pagarmeRecipientStatus: onboarding.recipientStatus, pagarmeKycUrl: onboarding.kycUrl ?? null, pagarmeKycExpiresAt: onboarding.kycExpiresAt ?? null }).where(eq(venues.id, venueId)); return getVenueById(venueId); }
 export async function getVenueById(venueId: number) { const db = await getDb(); if (!db) return undefined; const rows = await db.select().from(venues).where(eq(venues.id, venueId)).limit(1); return rows[0]; }
 export async function updateRequestStatus(requestId: number, status: "PLAYING" | "PLAYED" | "SKIPPED" | "CANCELLED") { const db = await getDb(); if (!db) throw new Error("Database unavailable"); await db.update(songRequests).set({ status }).where(eq(songRequests.id, requestId)); }
+
+export async function createPendingDevice(input: typeof devices.$inferInsert) {
+  const db = await getDb(); if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(devices).values(input);
+  const rows = await db.select().from(devices).where(eq(devices.id, Number(result[0].insertId))).limit(1);
+  return rows[0];
+}
+
+export async function getDeviceByActivationCode(activationCode: string) {
+  const db = await getDb(); if (!db) return undefined;
+  const rows = await db.select().from(devices).where(eq(devices.activationCode, activationCode.replace(/\D/g, ""))).limit(1);
+  return rows[0];
+}
+
+export async function getDeviceByToken(deviceToken: string) {
+  const db = await getDb(); if (!db) return undefined;
+  const rows = await db.select().from(devices).where(eq(devices.deviceToken, deviceToken)).limit(1);
+  return rows[0];
+}
+
+export async function activateDevice(deviceId: number, venueId: number, name?: string) {
+  const db = await getDb(); if (!db) throw new Error("Database unavailable");
+  await db.update(devices).set({ venueId, name: name || "TV Principal", status: "ONLINE", lastSeenAt: new Date() }).where(eq(devices.id, deviceId));
+  return getDeviceById(deviceId);
+}
+
+export async function getDeviceById(deviceId: number) {
+  const db = await getDb(); if (!db) return undefined;
+  const rows = await db.select().from(devices).where(eq(devices.id, deviceId)).limit(1);
+  return rows[0];
+}
+
+export async function markDeviceHeartbeat(deviceToken: string) {
+  const db = await getDb(); if (!db) throw new Error("Database unavailable");
+  await db.update(devices).set({ status: "ONLINE", lastSeenAt: new Date() }).where(eq(devices.deviceToken, deviceToken));
+  return getDeviceByToken(deviceToken);
+}
+
+export async function ensureDefaultVenueTable(venueId: number) {
+  const db = await getDb(); if (!db) throw new Error("Database unavailable");
+  const existing = await db.select().from(venueTables).where(and(eq(venueTables.venueId, venueId), eq(venueTables.label, "Mesa 01"))).limit(1);
+  if (existing[0]) return existing[0];
+  const token = Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-4);
+  const result = await db.insert(venueTables).values({ venueId, label: "Mesa 01", qrToken: token });
+  const rows = await db.select().from(venueTables).where(eq(venueTables.id, Number(result[0].insertId))).limit(1);
+  return rows[0];
+}

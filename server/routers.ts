@@ -5,8 +5,8 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { createPendingPayment, createPendingRequest, getPaymentByRequestId, getRequestById, getVenueByCode, getVenueById, listQueue, markRequestQueuedAfterApprovedPayment, updateRequestStatus, updateVenuePricing } from "./db";
-import { mockPaymentProvider, isApprovedPaymentPayload, verifyWebhookSignature } from "./payment";
+import { createPendingPayment, createPendingRequest, getPaymentByRequestId, getRequestById, getVenueByCode, getVenueById, listQueue, markRequestQueuedAfterApprovedPayment, updateRequestStatus, updateVenuePagarmeOnboarding, updateVenuePricing } from "./db";
+import { activePaymentProvider, mockPaymentProvider, isApprovedPaymentPayload, PagarMeApiError, PagarMePaymentProvider, verifyWebhookSignature } from "./payment";
 
 const statusSchema = z.enum(["PLAYING", "PLAYED", "SKIPPED", "CANCELLED"]);
 const mockRequests = new Map<number, { requestId: number; externalId: string; title: string; artist: string; paymentStatus: "PENDING" | "APPROVED"; requestStatus: "AWAITING_PAYMENT" | "QUEUED" }>();
@@ -22,11 +22,27 @@ export const appRouter = router({
     queue: publicProcedure.input(z.object({ venueId: z.number().int().positive() })).query(({ input }) => listQueue(input.venueId)),
     config: protectedProcedure.input(z.object({ venueId: z.number().int().positive() })).query(({ input }) => getVenueById(input.venueId)),
     updatePricing: protectedProcedure.input(z.object({ venueId: z.number().int().positive(), musicPriceCents: z.number().int().nonnegative(), dedicationPriceCents: z.number().int().nonnegative() })).mutation(({ input }) => updateVenuePricing(input.venueId, input.musicPriceCents, input.dedicationPriceCents)),
+    startPagarmeOnboarding: protectedProcedure.input(z.object({ venueId: z.number().int().positive(), registerInformation: z.record(z.string(), z.unknown()), defaultBankAccount: z.record(z.string(), z.unknown()) })).mutation(async ({ input }) => {
+      const venue = await getVenueById(input.venueId);
+      if (!venue) throw new TRPCError({ code: "NOT_FOUND", message: "Venue not found" });
+      if (venue.pagarmeRecipientId) throw new TRPCError({ code: "CONFLICT", message: "Venue already has a Pagar.me recipient" });
+      let onboarding;
+      try {
+        onboarding = await new PagarMePaymentProvider().startRecipientOnboarding({ code: `venue_${venue.id}`, registerInformation: input.registerInformation, defaultBankAccount: input.defaultBankAccount });
+      } catch (error) {
+        if (error instanceof PagarMeApiError && error.message.includes("not allowed to create a recipient")) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "A conta Pagar.me ainda nao esta habilitada para criar recebedores via API. Solicite a liberacao de marketplace/split ao Pagar.me e tente novamente." });
+        }
+        throw error;
+      }
+      await updateVenuePagarmeOnboarding(venue.id, onboarding);
+      return onboarding;
+    }),
   }),
   catalog: router({ list: publicProcedure.input(z.object({ query: z.string().max(80).optional() }).optional()).query(({ input }) => { const query = input?.query?.toLowerCase().trim(); return query ? catalog.filter((song) => `${song.title} ${song.artist}`.toLowerCase().includes(query)) : catalog; }) }),
   requests: router({
     mockCreate: publicProcedure.input(z.object({ title: z.string().min(1), artist: z.string().min(1) })).mutation(async ({ input }) => { const requestId = nextMockRequestId++; const payment = await mockPaymentProvider.createPayment({ requestId, amountCents: 300, description: `${input.title} — ${input.artist}` }); mockRequests.set(requestId, { requestId, externalId: payment.externalId, title: input.title, artist: input.artist, paymentStatus: "PENDING", requestStatus: "AWAITING_PAYMENT" }); return { requestId, externalId: payment.externalId, pixCopyPaste: payment.pixCopyPaste, status: "AWAITING_PAYMENT" as const }; }),
-    create: publicProcedure.input(z.object({ venueId: z.number().int().positive(), visitorName: z.string().min(1).max(80), tableCode: z.string().max(12).optional(), providerId: z.string().min(1).max(160), title: z.string().min(1).max(180), artist: z.string().min(1).max(180), message: z.string().max(180).optional(), amountCents: z.number().int().nonnegative() })).mutation(async ({ input }) => { const requestId = await createPendingRequest(input); const payment = await mockPaymentProvider.createPayment({ requestId, amountCents: input.amountCents, description: `${input.title} — ${input.artist}` }); const paymentId = await createPendingPayment({ requestId, amountCents: input.amountCents, externalId: payment.externalId, pixCopyPaste: payment.pixCopyPaste }); return { requestId, paymentId, externalId: payment.externalId, pixCopyPaste: payment.pixCopyPaste, status: "AWAITING_PAYMENT" as const }; }),
+    create: publicProcedure.input(z.object({ venueId: z.number().int().positive(), visitorName: z.string().min(1).max(80), tableCode: z.string().max(12).optional(), providerId: z.string().min(1).max(160), title: z.string().min(1).max(180), artist: z.string().min(1).max(180), message: z.string().max(180).optional(), amountCents: z.number().int().nonnegative(), payerEmail: z.string().email().optional() })).mutation(async ({ input }) => { const venue = await getVenueById(input.venueId); if (!venue) throw new TRPCError({ code: "NOT_FOUND", message: "Venue not found" }); const requestId = await createPendingRequest(input); const provider = activePaymentProvider(); const paymentProviderName = process.env.PAYMENT_PROVIDER?.toLowerCase() === "mercadopago" ? "mercadopago" : process.env.PAYMENT_PROVIDER?.toLowerCase() === "pagarme" ? "pagarme" : "mock"; const payment = await provider.createPayment({ requestId, amountCents: input.amountCents, description: `${input.title} — ${input.artist}`, venueRecipientId: venue.pagarmeRecipientId ?? undefined, splitBarPercent: venue.splitBarPercent ?? 70, mercadoPagoAccessToken: venue.mercadoPagoAccessToken ?? undefined, payerEmail: input.payerEmail }); const paymentId = await createPendingPayment({ requestId, provider: paymentProviderName, amountCents: input.amountCents, externalId: payment.externalId, pixCopyPaste: payment.pixCopyPaste }); return { requestId, paymentId, externalId: payment.externalId, pixCopyPaste: payment.pixCopyPaste, status: "AWAITING_PAYMENT" as const }; }),
     updateStatus: protectedProcedure.input(z.object({ requestId: z.number().int().positive(), status: statusSchema })).mutation(({ input }) => updateRequestStatus(input.requestId, input.status).then(() => ({ success: true as const }))),
   }),
   payments: router({
