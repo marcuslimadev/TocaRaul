@@ -1,5 +1,8 @@
 RewriteEngine On
 
+# Administrative control panel.
+RewriteRule ^admin/?$ admin.php [QSA,L]
+
 # QR codes printed for tables open the production customer flow.
 RewriteRule ^j/[A-Za-z0-9_-]{6,40}$ customer.php [QSA,L]
 
