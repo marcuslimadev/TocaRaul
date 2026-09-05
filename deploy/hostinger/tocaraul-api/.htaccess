@@ -1,5 +1,10 @@
 RewriteEngine On
+
+# Production commerce/payment/player endpoints are isolated from onboarding.
+RewriteRule ^api/commerce(?:/.*)?$ commerce.php [QSA,L]
+RewriteRule ^api/mercadopago/webhook$ commerce.php [QSA,L]
+RewriteRule ^api/player/(?:claim|complete)$ commerce.php [QSA,L]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [QSA,L]
-
