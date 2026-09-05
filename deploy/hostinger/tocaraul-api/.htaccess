@@ -1,5 +1,8 @@
 RewriteEngine On
 
+# QR codes printed for tables open the production customer flow.
+RewriteRule ^j/[A-Za-z0-9_-]{6,40}$ customer.php [QSA,L]
+
 # Production commerce/payment/player endpoints are isolated from onboarding.
 RewriteRule ^api/commerce(?:/.*)?$ commerce.php [QSA,L]
 RewriteRule ^api/mercadopago/webhook$ commerce.php [QSA,L]
