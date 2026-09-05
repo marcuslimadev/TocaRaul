@@ -6,6 +6,7 @@ RewriteRule ^j/[A-Za-z0-9_-]{6,40}$ customer.php [QSA,L]
 RewriteRule ^api/commerce(?:/.*)?$ commerce.php [QSA,L]
 RewriteRule ^api/mercadopago/webhook$ commerce.php [QSA,L]
 RewriteRule ^api/player/(?:claim|complete|command)$ commerce.php [QSA,L]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [QSA,L]
