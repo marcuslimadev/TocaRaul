@@ -1,16 +1,11 @@
 RewriteEngine On
 
-# Administrative control panel.
 RewriteRule ^admin/?$ admin.php [QSA,L]
-
-# QR codes printed for tables open the production customer flow.
+RewriteRule ^bar/?$ owner.php [QSA,L]
 RewriteRule ^j/[A-Za-z0-9_-]{6,40}$ customer.php [QSA,L]
-
-# Production commerce/payment/player endpoints are isolated from onboarding.
 RewriteRule ^api/commerce(?:/.*)?$ commerce.php [QSA,L]
 RewriteRule ^api/mercadopago/webhook$ commerce.php [QSA,L]
-RewriteRule ^api/player/(?:claim|complete)$ commerce.php [QSA,L]
-
+RewriteRule ^api/player/(?:claim|complete|command)$ commerce.php [QSA,L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [QSA,L]
