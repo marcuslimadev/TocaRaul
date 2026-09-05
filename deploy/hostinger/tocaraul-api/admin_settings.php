@@ -9,8 +9,9 @@ function settings_decrypt(string $value): string { if($value==='')return ''; $ra
 function setting_get(string $name): string { settings_schema();$q=settings_db()->prepare('SELECT encryptedValue FROM systemSettings WHERE settingKey=?');$q->execute([$name]);$row=$q->fetch();return $row?settings_decrypt((string)$row['encryptedValue']):''; }
 function setting_put(string $name,string $value): void { settings_schema();$q=settings_db()->prepare('INSERT INTO systemSettings(settingKey,encryptedValue) VALUES(?,?) ON DUPLICATE KEY UPDATE encryptedValue=VALUES(encryptedValue),updatedAt=CURRENT_TIMESTAMP');$q->execute([$name,settings_encrypt(trim($value))]); }
 function runtime_setting(string $settingKey,string $constantName=''): string { try{$stored=setting_get($settingKey);if($stored!=='')return $stored;}catch(Throwable $e){error_log('[TocaRaul config] '.$e->getMessage());} if($constantName!==''&&defined($constantName)){ $value=(string)constant($constantName);if($value!==''&&!in_array($value,['CHANGE_ME','https://SEU-DOMINIO-AQUI'],true))return $value;} $env=$constantName!==''?getenv($constantName):false;return is_string($env)?$env:''; }
-function runtime_public_url(): string { $url=runtime_setting('public_app_url','PUBLIC_APP_URL'); return rtrim($url,'/'); }
-function runtime_mp_client_id(): string { return runtime_setting('mercadopago_client_id','MERCADOPAGO_CLIENT_ID'); }
-function runtime_mp_client_secret(): string { return runtime_setting('mercadopago_client_secret','MERCADOPAGO_CLIENT_SECRET'); }
+function runtime_public_url(): string { return rtrim(runtime_setting('public_app_url','PUBLIC_APP_URL'),'/'); }
+function runtime_mp_access_token(): string { return runtime_setting('mercadopago_access_token','MERCADOPAGO_ACCESS_TOKEN'); }
+function runtime_mp_public_key(): string { return runtime_setting('mercadopago_public_key','MERCADOPAGO_PUBLIC_KEY'); }
 function runtime_mp_webhook_secret(): string { return runtime_setting('mercadopago_webhook_secret','MERCADOPAGO_WEBHOOK_SECRET'); }
+function runtime_platform_percent(): int { $v=(int)runtime_setting('platform_percent','TOCARAUL_PLATFORM_PERCENT'); return $v>0&&$v<100?$v:30; }
 function runtime_youtube_api_key(): string { return runtime_setting('youtube_api_key','YOUTUBE_API_KEY'); }
