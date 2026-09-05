@@ -2,6 +2,7 @@ package com.socimob.tocaraul.data.repository
 
 import com.socimob.tocaraul.data.api.TocaRaulApiClient
 import com.socimob.tocaraul.domain.model.ConnectionState
+import com.socimob.tocaraul.domain.model.Dedication
 import com.socimob.tocaraul.domain.model.Track
 import com.socimob.tocaraul.domain.model.JukeboxUiState
 import com.socimob.tocaraul.domain.repository.ActivationResult
@@ -56,6 +57,8 @@ class RemoteDeviceRepository(
             )
         } else {
             val nowPlayingJson = json.optJSONObject("nowPlaying")
+            val message = nowPlayingJson?.optString("message")?.takeIf { it.isNotBlank() && it != "null" }
+            val tableCode = nowPlayingJson?.optString("tableCode")?.takeIf { it.isNotBlank() && it != "null" }
             JukeboxUiState(
                 connection = ConnectionState.Online,
                 nowPlaying = nowPlayingJson?.let {
@@ -68,7 +71,7 @@ class RemoteDeviceRepository(
                         durationSeconds = null
                     )
                 },
-                dedication = null,
+                dedication = message?.let { Dedication(message = it, tableCode = tableCode) },
                 queueSize = json.optInt("queueSize", 0),
                 qrCodeUrl = json.optString("qrCodeUrl", ""),
                 activationCode = null,
