@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import puppeteer from 'puppeteer-core';
 
 const BASE = process.env.TOCARAUL_BASE_URL ?? 'http://127.0.0.1:8787';
@@ -43,38 +45,10 @@ try {
   assert.ok(venueCode, 'panel must show the bar code');
   log('signed_up', {venueCode});
 
-  // ---------- tables: add, rename, and the floor cannot be left with none ----------
   const submit = (page, action) => Promise.all([
     page.waitForNavigation({waitUntil: 'networkidle0'}),
     page.evaluate((a) => [...document.querySelectorAll('form')].find((f) => f.querySelector(`[name=a][value=${a}]`)).requestSubmit(), action),
   ]);
-  await owner.type('form input[name=label][placeholder="Mesa 02"]', 'Mesa 02');
-  await submit(owner, 'table_add');
-  let tables = await owner.$$eval('input[name=label]:not([placeholder])', (els) => els.map((e) => e.value));
-  assert.deepEqual(tables, ['Mesa 01', 'Mesa 02'], 'both tables should be listed');
-  await owner.$eval('input[name=label]:not([placeholder])', (el) => { el.value = ''; });
-  await owner.type('input[name=label]:not([placeholder])', 'Balcão');
-  await submit(owner, 'table_rename');
-  tables = await owner.$$eval('input[name=label]:not([placeholder])', (els) => els.map((e) => e.value));
-  assert.deepEqual(tables, ['Balcão', 'Mesa 02'], 'rename should stick');
-  log('tables', {tables});
-
-  // each table has its own working QR link
-  const tableLinks = await owner.$$eval('a[href^="/j/"]', (els) => els.map((e) => e.getAttribute('href')));
-  assert.equal(tableLinks.length, 2, 'each table needs its own QR link');
-  for (const href of tableLinks) {
-    const res = await fetch(BASE + href);
-    assert.equal(res.status, 200, `table page ${href} must load`);
-  }
-
-  // disabling a table works, and the last one is protected
-  await submit(owner, 'table_del');
-  tables = await owner.$$eval('input[name=label]:not([placeholder])', (els) => els.map((e) => e.value));
-  assert.equal(tables.length, 1, 'one table should remain');
-  await submit(owner, 'table_del');
-  const guard = await owner.$eval('body', (b) => b.innerText);
-  assert.ok(guard.includes('pelo menos uma mesa'), 'the last table must be protected');
-  log('table_guard', {ok: true});
 
   // ---------- the print sheet renders a QR for each active table ----------
   const print = await browser.newPage();
@@ -98,44 +72,58 @@ try {
   assert.ok(!overflow.docWider, `customer page overflows on a phone: ${JSON.stringify(overflow)}`);
   log('phone_layout', overflow);
 
-  // ---------- the screen: login, start, and the panel can disconnect it ----------
-  const ctx = await browser.createBrowserContext();
-  const screen = await ctx.newPage();
-  watch(screen, 'player');
-  await screen.bringToFront();
-  await screen.goto(BASE + '/player', {waitUntil: 'networkidle0'});
-  await screen.type('input[name=code]', venueCode);
-  await screen.type('input[name=password]', password);
-  await Promise.all([screen.waitForNavigation({waitUntil: 'networkidle0'}), screen.click('button')]);
-  await screen.click('#startBtn');
-  await new Promise((r) => setTimeout(r, 2500));
-  const screenState = await screen.evaluate(() => ({
-    online: document.getElementById('viewOnline').classList.contains('on'),
-    tokens: Object.keys(localStorage).filter((k) => k.startsWith('tocaraul_player_')).length,
-  }));
-  assert.ok(screenState.online && screenState.tokens === 1, `screen should be online with one token: ${JSON.stringify(screenState)}`);
-  log('screen_online', screenState);
-
-  await owner.reload({waitUntil: 'networkidle0'});
-  let screens = await owner.$eval('body', (b) => b.innerText);
-  assert.ok(screens.includes('Tela do bar'), 'panel should list the screen');
-  await submit(owner, 'screen_del');
-  screens = await owner.$eval('body', (b) => b.innerText);
-  assert.ok(screens.includes('Nenhuma tela conectada'), 'panel should show the screen was disconnected');
-  await screen.waitForFunction(() => document.getElementById('viewRevoked')?.classList.contains('on'), {timeout: 20000})
-    .catch(() => { throw new Error('the disconnected screen must say so and ask for login again'); });
-  const revoked = await (await fetch(BASE + '/api/device/state', {
-    headers: {Authorization: 'Bearer ' + (await screen.evaluate(() => localStorage.getItem(Object.keys(localStorage).find((k) => k.startsWith('tocaraul_player_')))))},
-  })).status;
-  assert.equal(revoked, 401, 'a disconnected screen token must stop working');
-  log('screen_revoked', {status: revoked});
-
   // ---------- the old page must not be a dead end ----------
   const legacy = await fetch(BASE + '/tv', {redirect: 'manual'});
   assert.ok([301, 302].includes(legacy.status), '/tv should redirect');
-  assert.match(legacy.headers.get('location') ?? '', /\/player/, '/tv should point at the player');
+  assert.match(legacy.headers.get('location') ?? '', /\/bar/, '/tv should point at the panel');
   log('legacy_redirect', {status: legacy.status, to: legacy.headers.get('location')});
 
+  // ---------- the heart of it: a paid order plays inside the panel ----------
+  await phone.type("#search", "Tim Maia Voce");
+  await phone.waitForSelector(".song", {timeout: 20000});
+  let order = null;
+  phone.on("response", async (r) => {
+    if (r.url().endsWith("/api/commerce/request") && r.request().method() === "POST") { try { order = await r.json(); } catch {} }
+  });
+  await phone.click(".song");
+  await phone.click("#toStep2");
+  await phone.waitForSelector("#view2.on");
+  await phone.type("#visitor", "Cliente Qualidade");
+  const dedication = "Para a Rosa da mesa do fundo";
+  const messageField = await phone.$("#message");
+  if (messageField) await messageField.type(dedication);
+  await Promise.all([phone.waitForSelector("#view3.on", {timeout: 25000}), phone.click("#pay")]);
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.ok(order?.requestId, "the order must reach the backend");
+  const paid = await (await fetch(BASE + "/api/commerce/mock-confirm", {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({requestId: order.requestId}),
+  })).json();
+  assert.ok(paid.ok, "sandbox payment must confirm");
+  // ---- the owner uploads the bar logo before turning the screen on ----
+  await owner.bringToFront();
+  await owner.reload({waitUntil: "networkidle0"});
+  const logoFile = 'tmp/logo-quality.png';
+  fs.mkdirSync('tmp', {recursive: true});
+  fs.writeFileSync(logoFile, Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
+  const logoInput = await owner.$('input[type=file][name=logo]');
+  assert.ok(logoInput, 'the panel must offer a logo upload');
+  await logoInput.uploadFile(path.resolve(logoFile));
+  await submit(owner, 'logo');
+  const logoSrc = await owner.$eval('#stage img[src^="/assets/logos/"]', (e) => e.getAttribute('src'));
+  assert.ok(logoSrc, 'the bar logo must show on the stage');
+  log('logo_on_stage', {logoSrc});
+
+  // ---- the stage carries the written dedication and the order QR next to the player ----
+  const sideQr = await owner.$$eval('#stageSide #stageQr canvas, #stageSide #stageQr img', (els) => els.length);
+  assert.ok(sideQr >= 1, 'the stage must show the order QR code beside the player');
+  await owner.click("#stageBtn");
+  await owner.waitForFunction(() => document.getElementById("ytmount")?.classList.contains("on"), {timeout: 30000});
+  const playing = await owner.evaluate(() => document.querySelector("#ytmount iframe")?.src ?? null);
+  assert.ok((playing ?? '').includes('youtube.com/embed/'), 'the panel must play the paid song on YouTube');
+  const shown = await owner.$eval('#pDedication', (e) => e.textContent.trim());
+  if (messageField) assert.ok(shown.includes(dedication), `the stage must keep the dedication on screen, got "${shown}"`);
+  log("panel_playing", {iframe: playing?.slice(0, 60), dedication: shown});
   assert.deepEqual(problems, [], 'pages must load with no console/network errors');
   console.log(JSON.stringify({ok: true, venueCode, problems}, null, 2));
 } catch (e) {

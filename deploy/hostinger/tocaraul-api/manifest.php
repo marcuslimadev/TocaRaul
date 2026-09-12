@@ -7,7 +7,7 @@ echo json_encode([
  'short_name'=>'TocaRaul',
  'description'=>'Fila de músicas, pedidos e dedicatórias na tela do seu estabelecimento.',
  'lang'=>'pt-BR',
- 'start_url'=>'/player',
+ 'start_url'=>'/bar',
  'scope'=>'/',
  'display'=>'standalone',
  'orientation'=>'landscape',

@@ -1,134 +1,80 @@
 <#
 .SYNOPSIS
-Publica o TocaRaul no servidor remoto a partir da branch main.
+Publica o TocaRaul (PHP) no public_html do Hostinger via SFTP.
 
 .DESCRIPTION
-O script valida, versiona e envia a branch main para o GitHub e atualiza o
-checkout remoto via SSH/rsync. A senha nunca é gravada neste arquivo: ela é
-lida de TOCARAUL_SSH_PASSWORD (ou BAUHAUS_SSH_PASSWORD) no .env.local.
+Copia deploy/hostinger/tocaraul-api/ para o servidor. Nunca envia api_config.php,
+que guarda os segredos de producao e vive fora do public_html.
+A senha vem de TOCARAUL_SSH_PASSWORD no .env.local.
 
 .EXAMPLE
-  .\deploy.ps1 -DeployPath '/var/www/tocaraul' -DeployRepoPath '/var/www/.tocaraul-git'
-
-.EXAMPLE
-  .\deploy.ps1 -RemoteOnly -DeployPath '/var/www/tocaraul' -HealthUrl 'https://tocaraul.lojadaesquina.store/api/health'
+  powershell -File ./deploy.ps1
+  powershell -File ./deploy.ps1 -Only owner.php,assets/player.js
+  powershell -File ./deploy.ps1 -DryRun
 #>
 [CmdletBinding()]
 param(
-  [string]$CommitMessage = "chore: deploy TocaRaul $(Get-Date -Format 'yyyy-MM-dd HH:mm')",
-  [string]$DeployPath,
-  [string]$DeployRepoPath,
-  [string]$HealthUrl = 'https://tocaraul.lojadaesquina.store/api/health',
-  [string]$SshHost = '179.199.129.224',
-  [int]$SshPort = 22,
-  [string]$SshUser = 'root',
-  [string]$SshHostKey = 'ssh-ed25519 255 SHA256:jDm0EETU3mnrAT/lxjiunu3CJLeQf8iDBSHKlMWpt9s',
-  [string]$Branch = 'main',
-  [switch]$SkipCommit,
-  [switch]$RemoteOnly,
-  [switch]$Force
+  [string[]]$Only,
+  [switch]$DryRun,
+  [string]$SshHost = '145.223.105.168',
+  [int]$Port = 65002,
+  [string]$User = 'u815655858',
+  [string]$RemoteBase = '/home/u815655858/domains/tocaraul.lojadaesquina.store/public_html'
 )
 
 $ErrorActionPreference = 'Stop'
-$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$ProjectRoot = $PSScriptRoot
+$root = $PSScriptRoot
+$localDir = Join-Path $root 'deploy/hostinger/tocaraul-api'
+if (-not (Test-Path $localDir)) { throw "Origem nao encontrada: $localDir" }
 
-function Step([string]$Message) { Write-Host "`n==> $Message" -ForegroundColor Cyan }
-function AssertExit([string]$Action) { if ($LASTEXITCODE -ne 0) { throw "$Action falhou (código $LASTEXITCODE)." } }
-function EnvValue([string]$Name) {
-  $file = Join-Path $ProjectRoot '.env.local'
-  if (-not (Test-Path -LiteralPath $file)) { return $null }
-  $line = Get-Content -LiteralPath $file | Where-Object { $_ -match "^\s*$([regex]::Escape($Name))\s*=" } | Select-Object -Last 1
-  if (-not $line) { return $null }
-  $value = ($line -replace "^\s*$([regex]::Escape($Name))\s*=\s*", '').Trim()
-  if ($value.Length -ge 2 -and (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'")))) { $value = $value.Substring(1, $value.Length - 2) }
-  return $value
-}
-function Bash([string]$Value) { return "'" + $Value.Replace("'", "'`"'`"'") + "'" }
-function OriginSshUrl {
-  $url = (& git remote get-url origin).Trim(); AssertExit 'Leitura do remote origin'
-  if ($url -match '^git@github\.com:(.+)$') { return "https://github.com/$($Matches[1])" }
-  if ($url -match '^https://github\.com/.+$') { return $url }
-  throw "Remote origin não suportado: $url"
-}
-
-if ([string]::IsNullOrWhiteSpace($DeployPath)) { $DeployPath = EnvValue 'TOCARAUL_DEPLOY_PATH' }
-if ([string]::IsNullOrWhiteSpace($DeployPath)) { throw 'Informe -DeployPath ou TOCARAUL_DEPLOY_PATH no .env.local.' }
-if ([string]::IsNullOrWhiteSpace($DeployRepoPath)) { $DeployRepoPath = EnvValue 'TOCARAUL_DEPLOY_REPO_PATH' }
-if ([string]::IsNullOrWhiteSpace($DeployRepoPath)) { throw 'Informe -DeployRepoPath ou TOCARAUL_DEPLOY_REPO_PATH no .env.local.' }
-$Password = EnvValue 'TOCARAUL_SSH_PASSWORD'
-if ([string]::IsNullOrWhiteSpace($Password)) { $Password = EnvValue 'BAUHAUS_SSH_PASSWORD' }
-if ([string]::IsNullOrWhiteSpace($Password)) {
-  $sshLine = Get-Content -LiteralPath (Join-Path $ProjectRoot '.env.local') | Where-Object { $_ -match '^\s*ssh\s+-p\s+\d+\s+\S+\s+\S+\s*$' } | Select-Object -Last 1
-  if ($sshLine -and $sshLine -match '^\s*ssh\s+-p\s+(\d+)\s+([^@\s]+)@([^\s]+)\s+(\S+)\s*$') {
-    $SshPort = [int]$Matches[1]
-    $SshUser = $Matches[2]
-    $SshHost = $Matches[3]
-    $Password = $Matches[4]
+$password = $env:TOCARAUL_SSH_PASSWORD
+if (-not $password) {
+  $envFile = Join-Path $root '.env.local'
+  if (Test-Path $envFile) {
+    $line = Select-String -Path $envFile -Pattern '^TOCARAUL_SSH_PASSWORD=(.+)$' | Select-Object -First 1
+    if ($line) { $password = $line.Matches[0].Groups[1].Value.Trim() }
   }
 }
-if ([string]::IsNullOrWhiteSpace($Password)) { throw 'Defina TOCARAUL_SSH_PASSWORD no .env.local.' }
+if (-not $password) { throw 'Defina TOCARAUL_SSH_PASSWORD no .env.local ou no ambiente.' }
 
-$plink = @(
-  (Join-Path ${env:ProgramFiles} 'PuTTY\plink.exe'),
-  (Join-Path ${env:ProgramFiles(x86)} 'PuTTY\plink.exe'),
-  (Join-Path ${env:LOCALAPPDATA} 'PuTTY\plink.exe')
-) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
-if (-not $plink) { throw 'PuTTY plink.exe não foi encontrado.' }
-$pscp = @(
-  (Join-Path ${env:ProgramFiles} 'PuTTY\pscp.exe'),
-  (Join-Path ${env:ProgramFiles(x86)} 'PuTTY\pscp.exe'),
-  (Join-Path ${env:LOCALAPPDATA} 'PuTTY\pscp.exe')
-) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
-if (-not $pscp) { throw 'PuTTY pscp.exe não foi encontrado.' }
-$hostKey = $SshHostKey
+# api_config.php mora fora do public_html: enviar seria sobrescrever os segredos de producao.
+# assets/logos guarda as logos que os bares enviaram pelo painel: e conteudo do servidor, nao do repo.
+$files = Get-ChildItem $localDir -Recurse -File |
+  Where-Object { $_.Name -ne 'api_config.php' } |
+  ForEach-Object { $_.FullName.Substring($localDir.Length + 1).Replace('\', '/') } |
+  Where-Object { -not $_.StartsWith('assets/logos/') }
+
+if ($Only) { $files = $files | Where-Object { $Only -contains $_ } }
+if (-not $files) { throw 'Nenhum arquivo a enviar.' }
+
+Write-Host "$($files.Count) arquivo(s) para $RemoteBase" -ForegroundColor Cyan
+if ($DryRun) { $files | ForEach-Object { Write-Host "  [dry-run] $_" }; return }
+
+Import-Module Posh-SSH -ErrorAction Stop
+$secure = ConvertTo-SecureString $password -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential($User, $secure)
+$sftp = New-SFTPSession -ComputerName $SshHost -Port $Port -Credential $cred -AcceptKey -Force
 
 try {
-  if (-not $RemoteOnly) {
-    Step 'Validando o projeto'
-    & git diff --check; AssertExit 'Verificação de formatação do Git'
-    Step 'Compilando o bundle de produção'
-    $env:NODE_ENV = 'production'
-    & pnpm install --frozen-lockfile; AssertExit 'Instalação das dependências'
-    & pnpm build; AssertExit 'Build de produção'
-    if (-not $SkipCommit) {
-      & git fetch origin $Branch; AssertExit 'Atualização das referências remotas'
-      $behind = [int](& git rev-list --count "HEAD..origin/$Branch"); AssertExit 'Verificação da branch remota'
-      if ($behind -gt 0 -and -not $Force) { throw "A branch local está $behind commit(s) atrás de origin/$Branch. Use -Force conscientemente." }
-      & git add -A; AssertExit 'Preparação das alterações'
-      & git diff --cached --quiet
-      if ($LASTEXITCODE -eq 1) { & git commit -m $CommitMessage; AssertExit 'Commit do deploy' }
-      elseif ($LASTEXITCODE -gt 1) { throw 'Não foi possível verificar as alterações preparadas.' }
-      & git push origin $Branch; AssertExit 'Envio para o GitHub'
+  foreach ($rel in $files) {
+    $remoteDir = $RemoteBase
+    if ($rel.Contains('/')) {
+      $remoteDir = "$RemoteBase/" + ($rel -replace '/[^/]+$', '')
+      if (-not (Test-SFTPPath -SFTPSession $sftp -Path $remoteDir)) {
+        New-SFTPItem -SFTPSession $sftp -Path $remoteDir -ItemType Directory | Out-Null
+      }
     }
+    Set-SFTPItem -SFTPSession $sftp -Destination $remoteDir -Path (Join-Path $localDir $rel) -Force
+    Write-Host "  enviado $rel" -ForegroundColor DarkGray
   }
-
-  Step 'Publicando no servidor remoto'
-  $remotePath = Bash $DeployPath
-  $remoteScript = @"
-set -euo pipefail
-deploy_path=$remotePath
-mkdir -p "`$deploy_path"
-printf '%s\n' "static-pending" > "`$deploy_path/.tocaraul-release"
-echo "Deploy concluído: `$(cat "`$deploy_path/.tocaraul-release")"
-"@
-  ($remoteScript -replace "`r`n", "`n") | & $plink -batch -P $SshPort -hostkey $hostKey -pw $Password "$SshUser@$SshHost" 'bash -s'
-  AssertExit 'Deploy remoto'
-
-  Step 'Enviando arquivos estáticos compilados'
-  $uploadPath = "/tmp/tocaraul-php-$([guid]::NewGuid().ToString('N'))"
-  & $plink -batch -P $SshPort -hostkey $hostKey -pw $Password "$SshUser@$SshHost" "mkdir -p '$uploadPath'"
-  AssertExit 'Criação da área temporária remota'
-  & $pscp -batch -P $SshPort -hostkey $hostKey -pw $Password -r (Join-Path $ProjectRoot 'deploy\hostinger\tocaraul-api\*') "$SshUser@$SshHost`:$uploadPath/"
-  AssertExit 'Envio do backend PHP'
-  $publish = "set -e; backup='$DeployPath/../public_html-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')'; cp -a '$DeployPath' `"`$backup`"; rsync -a --delete --exclude 'api_config.php' --exclude '.tocaraul_admin.key' '$uploadPath/' '$DeployPath/'; rm -rf '$uploadPath'; echo 'php-release' > '$DeployPath/.tocaraul-release'; php -l '$DeployPath/index.php'; echo BACKUP:`"`$backup`""
-  & $plink -batch -P $SshPort -hostkey $hostKey -pw $Password "$SshUser@$SshHost" $publish
-  AssertExit 'Publicação do backend PHP'
-
-  Step 'Verificando a aplicação publicada'
-  $health = Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing -TimeoutSec 20
-  if ($health.StatusCode -lt 200 -or $health.StatusCode -ge 400) { throw "Health check retornou HTTP $($health.StatusCode)." }
-  Write-Host "Health check OK: HTTP $($health.StatusCode)" -ForegroundColor Green
+} finally {
+  Remove-SFTPSession -SFTPSession $sftp | Out-Null
 }
-catch { Write-Host "`nFalha no deploy: $($_.Exception.Message)" -ForegroundColor Red; exit 1 }
-finally { $Password = $null }
+
+Write-Host 'Verificando /api/health...' -ForegroundColor Cyan
+try {
+  $health = Invoke-RestMethod -Uri 'https://tocaraul.lojadaesquina.store/api/health' -TimeoutSec 20
+  Write-Host ("  ok={0} database={1} paymentConfigured={2}" -f $health.ok, $health.database, $health.paymentConfigured) -ForegroundColor Green
+} catch {
+  Write-Warning "Nao consegui ler /api/health: $_"
+}

@@ -12,14 +12,9 @@ async function asaas(path,body){const r=await fetch('https://api-sandbox.asaas.c
 const db=await mysql.createConnection({host:'127.0.0.1',port:3307,user:'root',database:'tocaraul_e2e'});
 try {
  const health=await api('/api/commerce/health');assert.equal(health.environment,'sandbox');
- assert.match(process.env.TOCARAUL_ACTIVATION_CODE??'',/^\d{6}$/,'Informe o código exibido no Android; o teste não fabrica uma sessão substituta.');
- const [devices]=await db.query("SELECT * FROM devices WHERE activationCode=? AND status='PENDING_ACTIVATION' AND activationCodeExpiresAt>NOW()",[process.env.TOCARAUL_ACTIVATION_CODE]);
- assert.equal(devices.length,1,'A sessão do Android precisa estar aguardando ativação e não expirada.');
- const device={deviceToken:devices[0].deviceToken,activationCode:devices[0].activationCode};
  const password=randomBytes(18).toString('base64url');
- const bar=await api('/api/onboarding/activate-tv',{activationCode:device.activationCode,ownerName:'Responsável de Homologação',barName:'Bar Teste E2E '+Date.now(),phone:'11999999999',email:'',document:'24971563792',pixKeyType:'EMAIL',pixKey:'homologacao@tocaraul.example',password,acceptedTerms:true,tvName:'TV E2E'});
+ const bar=await api('/api/onboarding/register',{ownerName:'Responsável de Homologação',barName:'Bar Teste E2E '+Date.now(),phone:'11999999999',email:'',document:'24971563792',pixKeyType:'EMAIL',pixKey:'homologacao@tocaraul.example',password,acceptedTerms:true});
  assert.equal(bar.paymentProvider,'asaas');assert.ok(!bar.mercadoPagoConnectUrl);
- const state=await api('/api/device/state',null,device.deviceToken);assert.equal(state.connection,'ONLINE');
  const print=await (await fetch(bar.tablesPrintUrl)).text();assert.ok(print.includes('/assets/qrcode.js'));assert.ok(!print.includes('Conectar Mercado Pago'));
  const qrToken=bar.tableUrl.split('/').pop();
  const order=await api('/api/commerce/request',{qrToken,visitorName:'Cliente E2E',providerId:'youtube:M7lc1UVf-VE',title:'YouTube API Demo',artist:'YouTube Developers',message:'Teste de dedicatória'});
@@ -40,6 +35,6 @@ try {
  page=await fetch(base+'/admin');const ac=page.headers.get('set-cookie').split(';')[0];html=await page.text();const at=html.match(/name="csrf" value="([^"]+)"/)[1];
  page=await fetch(base+'/admin',{method:'POST',headers:{Cookie:ac,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({action:'login',csrf:at,username:'e2e_admin',password:adminPassword}),redirect:'manual'});assert.equal(page.status,302);
  const adminCookie=page.headers.get('set-cookie')?.split(';')[0]??ac;html=await (await fetch(base+'/admin',{headers:{Cookie:adminCookie}})).text();assert.ok(html.includes('Asaas sandbox e ambiente'));
- fs.writeFileSync('tmp/e2e-session.json',JSON.stringify({bar,device,order,password,ownerCookie,adminCookie,adminPassword},null,2));
- console.log(JSON.stringify({ok:true,venue:bar.venue,requestId:order.requestId,paymentStatus:confirmed.paymentStatus,requestStatus:confirmed.requestStatus,ledgerEntries:entries.length,barCents:entries[0].barCents,ownerPanel:true,adminPanel:true,duplicateWebhook:true,webhookDelivery:'local authenticated replay after real sandbox confirmation',androidPlayback:'pending observation'},null,2));
+ fs.mkdirSync('tmp',{recursive:true});fs.writeFileSync('tmp/e2e-session.json',JSON.stringify({bar,order,password,ownerCookie,adminCookie,adminPassword},null,2));
+ console.log(JSON.stringify({ok:true,venue:bar.venue,requestId:order.requestId,paymentStatus:confirmed.paymentStatus,requestStatus:confirmed.requestStatus,ledgerEntries:entries.length,barCents:entries[0].barCents,ownerPanel:true,adminPanel:true,duplicateWebhook:true,webhookDelivery:'local authenticated replay after real sandbox confirmation'},null,2));
 } finally {await db.end();}

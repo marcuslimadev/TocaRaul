@@ -5,7 +5,7 @@ import mysql from 'mysql2/promise';
 const base = process.env.TOCARAUL_BASE_URL ?? 'http://127.0.0.1:8787';
 const db = await mysql.createConnection({host: '127.0.0.1', port: 3307, user: 'root', database: 'tocaraul_e2e'});
 const csrfOf = (html) => html.match(/name=csrf value="([^"]+)"/)?.[1] ?? (() => { throw new Error('csrf not found'); })();
-const cookieOf = (res, fallback) => res.headers.get('set-cookie')?.split(';')[0] ?? fallback;
+const cookieOf = (res, fallback) => (res.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).find((c) => c.startsWith('tocaraul_bar=')) ?? fallback;
 const post = (path, cookie, fields) => fetch(base + path, {
   method: 'POST', redirect: 'manual',
   headers: {Cookie: cookie, 'Content-Type': 'application/x-www-form-urlencoded'},

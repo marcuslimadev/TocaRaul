@@ -107,8 +107,9 @@
       else { const t = setInterval(() => { if (ytApiReady) { clearInterval(t); begin(); } }, 200); }
     }
 
+    const set = (id, text) => { const node = el(id); if (node) node.textContent = text; };
+
     function paint(state) {
-      const set = (id, text) => { const node = el(id); if (node) node.textContent = text; };
       set(ui.venue, state.venue?.name || 'TocaRaul');
       set(ui.queue, (state.queueSize || 0) + ' pedido(s) na fila');
       if (!currentlyPlaying) {
@@ -139,10 +140,13 @@
               if (track.message && state.venue?.announceDedication !== false) {
                 voiceDone = false;
                 const who = track.visitorName && track.visitorName !== 'Cliente' ? track.visitorName : 'um cliente';
-                const table = track.tableCode ? ' da mesa ' + track.tableCode : '';
-                speak('Uma dedicatória de ' + who + table + '. ' + track.message + '. E agora, para você: ' + track.title + '.')
+                speak('Uma dedicatória de ' + who + '. ' + track.message + '. E agora, para você: ' + track.title + '.')
                   .then(() => { voiceDone = true; rampVolumeUp(); });
               } else voiceDone = true;
+              // paint() leaves the texts alone while a song runs, so write this one's now.
+              set(ui.title, track.title || '');
+              set(ui.artist, track.artist || '');
+              set(ui.dedication, track.message ? track.message + (track.visitorName ? ' — ' + track.visitorName : '') : '');
               startPlayback(videoId, track.id);
             } else if (track) {
               await api('/api/player/complete', { requestId: parseInt(track.id, 10), result: 'SKIPPED' }, deviceToken);

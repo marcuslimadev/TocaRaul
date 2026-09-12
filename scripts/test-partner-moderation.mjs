@@ -37,14 +37,11 @@ try {
   html = await (await fetch(base + '/parceiro', {headers: {Cookie: partnerCookie}})).text();
   assert.ok(html.includes('Cadastrar novo bar'), 'partner panel should show the register form');
 
-  // ---- partner registers a bar for a TV waiting activation ----
-  const session = await (await fetch(base + '/api/device/session', {
-    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: 'TV Parceiro'}),
-  })).json();
+  // ---- partner registers a bar ----
   const ownerPassword = randomBytes(12).toString('base64url');
   const barName = 'Bar Parceiro ' + Date.now();
   out = await form('/parceiro', partnerCookie, {
-    a: 'register', csrf: csrfOf(html), activationCode: session.activationCode, tvName: 'TV Parceiro',
+    a: 'register', csrf: csrfOf(html),
     barName, ownerName: 'Dono Teste', phone: '11999999999', email: '', document: '24971563792',
     pixKeyType: 'EMAIL', pixKey: 'parceiro@tocaraul.example', ownerPassword,
   });

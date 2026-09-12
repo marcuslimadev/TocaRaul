@@ -45,10 +45,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   if($a==='register'){
    if(!empty($_SESSION['must_change']))throw new RuntimeException('Troque a senha inicial antes de cadastrar bares.');
    $result=onboard_venue([
-    'activationCode'=>$_POST['activationCode']??'','ownerName'=>$_POST['ownerName']??'','barName'=>$_POST['barName']??'',
+    'ownerName'=>$_POST['ownerName']??'','barName'=>$_POST['barName']??'',
     'phone'=>$_POST['phone']??'','email'=>$_POST['email']??'','document'=>$_POST['document']??'',
     'pixKeyType'=>$_POST['pixKeyType']??'','pixKey'=>$_POST['pixKey']??'','password'=>$_POST['ownerPassword']??'',
-    'tvName'=>$_POST['tvName']??'TV Principal','acceptedTerms'=>true,
+    'acceptedTerms'=>true,
    ],$pid);
    $_SESSION['handoff']=$result+['ownerPassword'=>(string)($_POST['ownerPassword']??'')];
    header('Location:/parceiro');exit;
@@ -80,7 +80,7 @@ $reset=null;
 if(!empty($_SESSION['reset'])){$reset=$_SESSION['reset'];unset($_SESSION['reset']);}
 $bars=[];
 if($partner&&!$must){
- $q=settings_db()->prepare("SELECT v.id,v.code,v.name,v.createdAt,(SELECT COUNT(*) FROM devices d WHERE d.venueId=v.id AND d.status='ONLINE') tvs FROM venues v WHERE v.partnerId=? ORDER BY v.id DESC");
+ $q=settings_db()->prepare("SELECT v.id,v.code,v.name,v.createdAt FROM venues v WHERE v.partnerId=? ORDER BY v.id DESC");
  $q->execute([(int)$partner['id']]);$bars=$q->fetchAll();
 }
 $base=rtrim(runtime_public_url(),'/');
@@ -174,12 +174,10 @@ a{color:#fc0}
 
 <div class=c>
  <h2>Cadastrar novo bar</h2>
- <p class=muted>Cadastre o bar aqui. Depois abra <a href="<?=h($base)?>/player" target=_blank><?=h($base)?>/player</a> no equipamento ligado na tela e entre com o código e a senha do bar. O código da TV abaixo é opcional.</p>
+ <p class=muted>Cadastre o bar aqui. Depois o dono entra em <a href="<?=h($base)?>/bar" target=_blank><?=h($base)?>/bar</a> no computador ligado na tela: o próprio painel toca a fila.</p>
  <form method=post>
   <input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=register>
   <div class=grid>
-   <div><label>Código da tela (opcional)</label><input name=activationCode inputmode=numeric maxlength=6></div>
-   <div><label>Nome da tela</label><input name=tvName value="Tela principal"></div>
    <div><label>Nome do bar</label><input name=barName required></div>
    <div><label>Responsável (dono)</label><input name=ownerName required></div>
    <div><label>Telefone do dono</label><input name=phone inputmode=numeric required></div>
@@ -201,7 +199,7 @@ a{color:#fc0}
  <?php if(!$bars):?><p class=muted>Nenhum bar cadastrado ainda.</p><?php endif;?>
  <?php foreach($bars as $b):?>
  <div class=item>
-  <b><?=h($b['name'])?></b> · <span class=muted>código <?=h($b['code'])?> · <?=(int)$b['tvs']?> TV(s) online · <?=h(substr((string)$b['createdAt'],0,10))?></span>
+  <b><?=h($b['name'])?></b> · <span class=muted>código <?=h($b['code'])?> · <?=h(substr((string)$b['createdAt'],0,10))?></span>
   <div class=row style="margin-top:6px">
    <a href="<?=h($base)?>/mesas?venue=<?=h(rawurlencode($b['code']))?>" target=_blank>QR das mesas</a>
    <form method=post onsubmit="return confirm('Gerar uma nova senha para o dono deste bar? A senha atual deixa de funcionar.')">

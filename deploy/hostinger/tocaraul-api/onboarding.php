@@ -42,33 +42,11 @@ function venue_login(string $code,string $password):?array{
  return $v;
 }
 
-/** Links a screen that is showing a pairing code to a bar that already exists. */
-function pair_device(int $venueId,string $code,string $tvName='TV Principal'):array{
- $code=preg_replace('/\D+/','',$code);
- if($code==='')throw new OnboardingError('Informe o código de 6 dígitos que aparece na TV.',400);
- $pdo=settings_db();
- $q=$pdo->prepare('SELECT * FROM devices WHERE activationCode=? LIMIT 1');$q->execute([$code]);
- $device=$q->fetch();
- if(!$device||$device['status']!=='PENDING_ACTIVATION')throw new OnboardingError('Código não encontrado. Confira o número na tela da TV.',404);
- if(strtotime($device['activationCodeExpiresAt'])<time())throw new OnboardingError('Código expirado. Recarregue a tela da TV para gerar outro.',410);
- $pdo->beginTransaction();
- try{
-  $q=$pdo->prepare('SELECT * FROM devices WHERE id=? FOR UPDATE');$q->execute([$device['id']]);$locked=$q->fetch();
-  if(!$locked||$locked['status']!=='PENDING_ACTIVATION')throw new OnboardingError('Essa TV já foi conectada.',409);
-  $pdo->prepare("UPDATE devices SET venueId=?,name=?,status='ONLINE',lastSeenAt=NOW() WHERE id=?")->execute([$venueId,$tvName?:'TV Principal',$device['id']]);
-  $pdo->commit();
- }catch(Throwable $e){$pdo->rollBack();throw $e;}
- ensure_default_table($venueId);
- return ['ok'=>true,'deviceId'=>(int)$device['id']];
-}
-
 /**
  * Registers the bar and its owner login. Single source of truth for onboarding.
- * activationCode is optional: when given, the pending TV is paired right away;
- * when omitted, the bar is created first and pairs a TV later from its panel.
+ * There is no screen to pair: the panel at /bar is the player.
  */
 function onboard_venue(array $p, ?int $partnerId = null): array {
- $code=preg_replace('/\D+/','',(string)($p['activationCode']??''));
  $owner=trim((string)($p['ownerName']??''));
  $bar=trim((string)($p['barName']??''));
  $phone=preg_replace('/\D+/','',(string)($p['phone']??''));
@@ -77,25 +55,14 @@ function onboard_venue(array $p, ?int $partnerId = null): array {
  $pixType=strtoupper(trim((string)($p['pixKeyType']??'')));
  $pix=trim((string)($p['pixKey']??''));
  $password=(string)($p['password']??'');
- $tv=trim((string)($p['tvName']??'TV Principal'));
  if(!in_array($pixType,['CPF','CNPJ','EMAIL','PHONE','EVP'],true)||$pix===''||strlen($pix)>180||strlen($password)<10)
   throw new OnboardingError('Informe chave Pix, tipo e senha de pelo menos 10 caracteres.',400);
  if($owner===''||$bar===''||$phone===''||$doc==='')throw new OnboardingError('Preencha cadastro, documento e telefone',400);
  if(empty($p['acceptedTerms']))throw new OnboardingError('Aceite os termos',400);
  ensure_onboarding_columns();
  $pdo=settings_db();
- $device=null;
- if($code!==''){
-  $q=$pdo->prepare('SELECT * FROM devices WHERE activationCode=? LIMIT 1');$q->execute([$code]);$device=$q->fetch();
-  if(!$device||$device['status']!=='PENDING_ACTIVATION')throw new OnboardingError('Codigo da TV nao encontrado',404);
-  if(strtotime($device['activationCodeExpiresAt'])<time())throw new OnboardingError('Codigo da TV expirado. Reinicie o app na TV.',410);
- }
  $pdo->beginTransaction();
  try{
-  if($device){
-   $q=$pdo->prepare("SELECT * FROM devices WHERE id=? FOR UPDATE");$q->execute([$device['id']]);$locked=$q->fetch();
-   if(!$locked||$locked['status']!=='PENDING_ACTIVATION')throw new OnboardingError('TV já ativada.',409);
-  }
   $open='bar-'.bin2hex(random_bytes(16));
   $q=$pdo->prepare("INSERT INTO users(openId,name,email,loginMethod,role) VALUES(?,?,?,'phone','admin')");
   $q->execute([$open,$owner,$email?:null]);
@@ -104,12 +71,11 @@ function onboard_venue(array $p, ?int $partnerId = null): array {
   $q=$pdo->prepare('INSERT INTO venues(ownerId,code,name,musicPriceCents,dedicationPriceCents,splitBarPercent,splitPlatformPercent,ownerDocument,ownerPhone,pixKeyType,pixKey,ownerPasswordHash,partnerId,splitAcceptedAt,termsAcceptedAt) VALUES(?,?,?,500,0,70,30,?,?,?,?,?,?,NOW(),NOW())');
   $q->execute([$uid,$venueCode,$bar,$doc,$phone,$pixType,$pix,password_hash($password,PASSWORD_DEFAULT),$partnerId]);
   $venueId=(int)$pdo->lastInsertId();
-  if($device)$pdo->prepare("UPDATE devices SET venueId=?,name=?,status='ONLINE',lastSeenAt=NOW() WHERE id=?")->execute([$venueId,$tv?:'TV Principal',$device['id']]);
   $pdo->commit();
  }catch(Throwable $e){$pdo->rollBack();throw $e;}
  $table=ensure_default_table($venueId);
  $base=rtrim(runtime_public_url(),'/');
- return ['ok'=>true,'deviceToken'=>$device['deviceToken']??null,'tvPaired'=>(bool)$device,'venue'=>['id'=>$venueId,'name'=>$bar,'code'=>$venueCode],
+ return ['ok'=>true,'venue'=>['id'=>$venueId,'name'=>$bar,'code'=>$venueCode],
   'tableUrl'=>$base.'/j/'.$table['qrToken'],'tablesPrintUrl'=>$base.'/mesas?venue='.$venueCode,
   'ownerPanelUrl'=>$base.'/bar','paymentProvider'=>'asaas','environment'=>'sandbox'];
 }
