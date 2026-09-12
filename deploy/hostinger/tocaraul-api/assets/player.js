@@ -11,7 +11,7 @@
     try { deviceToken = localStorage.getItem(store) || null; } catch (e) {}
 
     let started = false, pendingRequestId = null, pendingResult = null, currentlyPlaying = false;
-    let ytApiReady = false, ytPlayer = null, watchdog = null, commandTimer = null;
+    let ytApiReady = false, ytPlayer = null, watchdog = null;
     let voiceDone = true, pausedByOwner = false, ptVoice = null;
 
     window.onYouTubeIframeAPIReady = () => { ytApiReady = true; };
@@ -61,7 +61,7 @@
     function finishPlayback(result) {
       if (!currentlyPlaying) return;
       currentlyPlaying = false; pausedByOwner = false;
-      clearWatchdog(); clearInterval(commandTimer);
+      clearWatchdog();
       mount.classList.remove('on');
       try { ytPlayer && ytPlayer.stopVideo && ytPlayer.stopVideo(); } catch (e) {}
       pendingResult = result;
@@ -94,20 +94,21 @@
             onError: () => finishPlayback('SKIPPED'),
           },
         });
-        commandTimer = setInterval(async () => {
-          try {
-            const c = await api('/api/player/command', {}, deviceToken);
-            if (c.command === 'SKIP') finishPlayback('SKIPPED');
-            else if (c.command === 'PAUSE' && ytPlayer) { pausedByOwner = true; clearWatchdog(); ytPlayer.pauseVideo(); }
-            else if (c.command === 'PLAY' && ytPlayer) { pausedByOwner = false; ytPlayer.playVideo(); }
-          } catch (e) {}
-        }, 1500);
       };
       if (ytApiReady) begin();
       else { const t = setInterval(() => { if (ytApiReady) { clearInterval(t); begin(); } }, 200); }
     }
 
     const set = (id, text) => { const node = el(id); if (node) node.textContent = text; };
+
+    // The owner's PLAY/PAUSE/SKIP rides along with the state poll.
+    function applyCommand(command) {
+      if (!command) return;
+      if (command === 'SKIP') { if (currentlyPlaying) finishPlayback('SKIPPED'); return; }
+      if (!ytPlayer) return;
+      if (command === 'PAUSE') { pausedByOwner = true; clearWatchdog(); ytPlayer.pauseVideo(); }
+      else if (command === 'PLAY') { pausedByOwner = false; ytPlayer.playVideo(); }
+    }
 
     function paint(state) {
       set(ui.venue, state.venue?.name || 'TocaRaul');
@@ -126,8 +127,8 @@
         const state = await api('/api/device/state', null, deviceToken);
         if (state.connection === 'ONLINE') {
           if (opts.onOnline) opts.onOnline(state);
-          api('/api/device/heartbeat', {}, deviceToken).catch(() => {});
           paint(state);
+          applyCommand(state.command);
           if (pendingRequestId && pendingResult) {
             await api('/api/player/complete', { requestId: parseInt(pendingRequestId, 10), result: pendingResult }, deviceToken);
             pendingRequestId = null; pendingResult = null;
@@ -158,7 +159,7 @@
         if (e.status === 410 || e.status === 404) { try { localStorage.removeItem(store); } catch (x) {} deviceToken = null; }
         if (opts.onOffline) opts.onOffline(null);
       }
-      setTimeout(tick, 2000);
+      setTimeout(tick, currentlyPlaying ? 2000 : 5000);
     }
 
     return {

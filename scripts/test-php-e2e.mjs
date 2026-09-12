@@ -30,11 +30,23 @@ try {
  page=await fetch(base+'/bar',{method:'POST',headers:{Cookie:cookie,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({a:'login',csrf,code:bar.venue.code,password}),redirect:'manual'});assert.equal(page.status,302);
  const ownerCookie=page.headers.get('set-cookie')?.split(';')[0]??cookie;
  html=await (await fetch(base+'/bar',{headers:{Cookie:ownerCookie}})).text();assert.ok(html.includes(bar.venue.name));assert.ok(html.includes('R$ 3,50'));assert.ok(html.includes('R$ 50,00'));
+ // The panel is the player: one poll must carry the state, the heartbeat and the owner's command.
+ const ownerCsrf=html.match(/name=csrf value="([^"]+)"/)[1];
+ const player=await (await fetch(base+'/api/player/token',{method:'POST',headers:{Cookie:ownerCookie,'Content-Type':'application/json'},body:JSON.stringify({name:'Painel E2E'})})).json();
+ assert.ok(player.deviceToken,'o painel precisa emitir o proprio token de player');
+ await fetch(base+'/bar',{method:'POST',headers:{Cookie:ownerCookie,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({a:'cmd',csrf:ownerCsrf,cmd:'PAUSE'}),redirect:'manual'});
+ const withCommand=await api('/api/device/state',null,player.deviceToken);
+ assert.equal(withCommand.connection,'ONLINE');
+ assert.equal(withCommand.command,'PAUSE','o comando do dono precisa chegar junto do estado');
+ const afterCommand=await api('/api/device/state',null,player.deviceToken);
+ assert.equal(afterCommand.command,null,'o comando so pode ser entregue uma vez');
+ const [[seen]]=await db.query('SELECT status,lastSeenAt FROM devices WHERE deviceToken=?',[player.deviceToken]);
+ assert.equal(seen.status,'ONLINE','o proprio state faz as vezes de heartbeat');
  const adminPassword=randomBytes(18).toString('base64url');const hash=execFileSync('C:/xampp/php/php.exe',['-r','echo password_hash($argv[1], PASSWORD_DEFAULT);',adminPassword],{encoding:'utf8'});
  await fetch(base+'/admin');await db.execute("INSERT INTO adminUsers(username,passwordHash,mustChangePassword) VALUES('e2e_admin',?,0) ON DUPLICATE KEY UPDATE passwordHash=VALUES(passwordHash)",[hash]);
  page=await fetch(base+'/admin');const ac=page.headers.get('set-cookie').split(';')[0];html=await page.text();const at=html.match(/name="csrf" value="([^"]+)"/)[1];
  page=await fetch(base+'/admin',{method:'POST',headers:{Cookie:ac,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({action:'login',csrf:at,username:'e2e_admin',password:adminPassword}),redirect:'manual'});assert.equal(page.status,302);
  const adminCookie=page.headers.get('set-cookie')?.split(';')[0]??ac;html=await (await fetch(base+'/admin',{headers:{Cookie:adminCookie}})).text();assert.ok(html.includes('Asaas sandbox e ambiente'));
  fs.mkdirSync('tmp',{recursive:true});fs.writeFileSync('tmp/e2e-session.json',JSON.stringify({bar,order,password,ownerCookie,adminCookie,adminPassword},null,2));
- console.log(JSON.stringify({ok:true,venue:bar.venue,requestId:order.requestId,paymentStatus:confirmed.paymentStatus,requestStatus:confirmed.requestStatus,ledgerEntries:entries.length,barCents:entries[0].barCents,ownerPanel:true,adminPanel:true,duplicateWebhook:true,webhookDelivery:'local authenticated replay after real sandbox confirmation'},null,2));
+ console.log(JSON.stringify({ok:true,venue:bar.venue,requestId:order.requestId,paymentStatus:confirmed.paymentStatus,requestStatus:confirmed.requestStatus,ledgerEntries:entries.length,barCents:entries[0].barCents,ownerPanel:true,adminPanel:true,duplicateWebhook:true,webhookDelivery:'local authenticated replay after real sandbox confirmation',ownerCommandOnStatePoll:true},null,2));
 } finally {await db.end();}

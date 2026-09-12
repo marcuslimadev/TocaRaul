@@ -126,3 +126,21 @@ próprio PHP no primeiro upload. **O deploy nunca sobrescreve nem apaga essa
 pasta** (`deploy.ps1` a exclui da lista de envio) — ela é conteúdo do servidor,
 não do repositório. Se o upload falhar com "Não consegui gravar a logo no
 servidor", confira a permissão de escrita de `public_html/assets`.
+
+## Limite de conexões MySQL da Hostinger
+
+O plano limita o usuário do banco a **500 conexões por hora** — estourar devolve
+`SQLSTATE[HY000] [1226] ... max_connections_per_hour` e o site inteiro responde
+500 até virar a hora. Duas defesas no código:
+
+- `settings_db()` abre a conexão com `PDO::ATTR_PERSISTENT`, então os workers do
+  PHP-FPM reaproveitam a mesma conexão em vez de abrir uma por requisição.
+- O painel faz **um** pedido por ciclo: `/api/device/state` devolve estado,
+  registra o heartbeat e entrega o comando PLAY/PAUSE/SKIP pendente. O ciclo é
+  de 2s enquanto toca e 5s parado.
+
+Se voltar a estourar, o sintoma aparece assim (o log fica só no stderr do PHP):
+
+```bash
+ssh -p 65002 u815655858@145.223.105.168   "cd ~/domains/tocaraul.lojadaesquina.store/public_html && php -d error_log=/dev/stderr    -r '\$_SERVER[\"REQUEST_URI\"]=\"/api/health\";\$_SERVER[\"REQUEST_METHOD\"]=\"GET\";include \"index.php\";'"
+```
