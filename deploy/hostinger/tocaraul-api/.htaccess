@@ -3,6 +3,7 @@ RewriteEngine On
 RewriteRule ^favicon.ico$ assets/icon-192.png [L]
 RewriteRule ^$ home.php [QSA,L]
 RewriteRule ^admin/?$ admin.php [QSA,L]
+RewriteRule ^api/oauth/google/(?:start|callback)$ google_bar.php [QSA,L]
 RewriteRule ^auth/google/(?:start|callback)$ google_bar.php [QSA,L]
 RewriteRule ^bar/?$ owner.php [QSA,L]
 RewriteRule ^player/?$ player.php [QSA,L]
