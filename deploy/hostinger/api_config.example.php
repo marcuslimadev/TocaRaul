@@ -8,6 +8,8 @@ define('DB_PASS', 'CHANGE_ME');
 
 // Public HTTPS origin where deploy/hostinger/tocaraul-api is served.
 define('PUBLIC_APP_URL', 'https://SEU-DOMINIO-AQUI');
+define('GOOGLE_CLIENT_ID', 'CHANGE_ME');
+define('GOOGLE_CLIENT_SECRET', 'CHANGE_ME');
 
 // Mercado Pago application credentials (platform/TocaRaul app).
 define('MERCADOPAGO_CLIENT_ID', 'CHANGE_ME');
