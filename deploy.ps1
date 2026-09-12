@@ -75,6 +75,12 @@ $plink = @(
   (Join-Path ${env:LOCALAPPDATA} 'PuTTY\plink.exe')
 ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
 if (-not $plink) { throw 'PuTTY plink.exe não foi encontrado.' }
+$pscp = @(
+  (Join-Path ${env:ProgramFiles} 'PuTTY\pscp.exe'),
+  (Join-Path ${env:ProgramFiles(x86)} 'PuTTY\pscp.exe'),
+  (Join-Path ${env:LOCALAPPDATA} 'PuTTY\pscp.exe')
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
+if (-not $pscp) { throw 'PuTTY pscp.exe não foi encontrado.' }
 $hostKey = $SshHostKey
 
 try {
@@ -83,7 +89,7 @@ try {
     & git diff --check; AssertExit 'Verificação de formatação do Git'
     Step 'Compilando o bundle de produção'
     $env:NODE_ENV = 'production'
-    & pnpm install --frozen-lockfile --allow-build=esbuild --allow-build=@tailwindcss/oxide; AssertExit 'Instalação das dependências'
+    & pnpm install --frozen-lockfile; AssertExit 'Instalação das dependências'
     & pnpm build; AssertExit 'Build de produção'
     if (-not $SkipCommit) {
       & git fetch origin $Branch; AssertExit 'Atualização das referências remotas'
@@ -98,38 +104,25 @@ try {
   }
 
   Step 'Publicando no servidor remoto'
-  $repoUrl = Bash (OriginSshUrl)
   $remotePath = Bash $DeployPath
-  $repoPath = Bash $DeployRepoPath
-  $branchName = Bash $Branch
   $remoteScript = @"
 set -euo pipefail
 deploy_path=$remotePath
-repo_path=$repoPath
-repo_url=$repoUrl
-branch=$branchName
-command -v git >/dev/null
-command -v rsync >/dev/null
-command -v pnpm >/dev/null
-mkdir -p "`$(dirname "`$repo_path")"
-if [ ! -d "`$repo_path/.git" ]; then git clone --branch "`$branch" "`$repo_url" "`$repo_path"; else git -C "`$repo_path" fetch origin "`$branch"; git -C "`$repo_path" checkout -B "`$branch" "origin/`$branch"; git -C "`$repo_path" reset --hard "origin/`$branch"; fi
-cd "`$repo_path"
-NODE_ENV=production pnpm install --frozen-lockfile --allow-build=esbuild --allow-build=@tailwindcss/oxide
-NODE_ENV=production pnpm build
 mkdir -p "`$deploy_path"
-rsync -a --delete \
-  --exclude '.git/' --exclude '.env*' --exclude 'node_modules/' --exclude 'Android/' \
-  --exclude 'client/' --exclude 'drizzle/' --exclude 'docs/' --exclude 'scripts/' \
-  --exclude 'tmp/' --exclude 'dist/public/' \
-  "`$repo_path/" "`$deploy_path/"
-mkdir -p "`$deploy_path/public"
-rsync -a --delete "`$repo_path/dist/public/" "`$deploy_path/public/"
-test -f "`$deploy_path/dist/index.js"
-printf '%s\n' "`$(git -C "`$repo_path" rev-parse HEAD)" > "`$deploy_path/.tocaraul-release"
+printf '%s\n' "static-pending" > "`$deploy_path/.tocaraul-release"
 echo "Deploy concluído: `$(cat "`$deploy_path/.tocaraul-release")"
 "@
   ($remoteScript -replace "`r`n", "`n") | & $plink -batch -P $SshPort -hostkey $hostKey -pw $Password "$SshUser@$SshHost" 'bash -s'
   AssertExit 'Deploy remoto'
+
+  Step 'Enviando arquivos estáticos compilados'
+  $uploadPath = "/tmp/tocaraul-static-$([guid]::NewGuid().ToString('N'))"
+  & $plink -batch -P $SshPort -hostkey $hostKey -pw $Password "$SshUser@$SshHost" "mkdir -p '$uploadPath'"
+  AssertExit 'Criação da área temporária remota'
+  & $pscp -batch -P $SshPort -hostkey $hostKey -pw $Password -r (Join-Path $ProjectRoot 'dist\public\*') "$SshUser@$SshHost`:$uploadPath/"
+  AssertExit 'Envio do bundle estático'
+  & $plink -batch -P $SshPort -hostkey $hostKey -pw $Password "$SshUser@$SshHost" "rsync -a --delete '$uploadPath/' '$DeployPath/'; rm -rf '$uploadPath'; echo 'static-release' > '$DeployPath/.tocaraul-release'"
+  AssertExit 'Publicação dos arquivos estáticos'
 
   Step 'Verificando a aplicação publicada'
   $health = Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing -TimeoutSec 20
