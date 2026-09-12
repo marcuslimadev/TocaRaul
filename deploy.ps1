@@ -116,13 +116,14 @@ echo "Deploy concluído: `$(cat "`$deploy_path/.tocaraul-release")"
   AssertExit 'Deploy remoto'
 
   Step 'Enviando arquivos estáticos compilados'
-  $uploadPath = "/tmp/tocaraul-static-$([guid]::NewGuid().ToString('N'))"
+  $uploadPath = "/tmp/tocaraul-php-$([guid]::NewGuid().ToString('N'))"
   & $plink -batch -P $SshPort -hostkey $hostKey -pw $Password "$SshUser@$SshHost" "mkdir -p '$uploadPath'"
   AssertExit 'Criação da área temporária remota'
-  & $pscp -batch -P $SshPort -hostkey $hostKey -pw $Password -r (Join-Path $ProjectRoot 'dist\public\*') "$SshUser@$SshHost`:$uploadPath/"
-  AssertExit 'Envio do bundle estático'
-  & $plink -batch -P $SshPort -hostkey $hostKey -pw $Password "$SshUser@$SshHost" "rsync -a --delete '$uploadPath/' '$DeployPath/'; rm -rf '$uploadPath'; echo 'static-release' > '$DeployPath/.tocaraul-release'"
-  AssertExit 'Publicação dos arquivos estáticos'
+  & $pscp -batch -P $SshPort -hostkey $hostKey -pw $Password -r (Join-Path $ProjectRoot 'deploy\hostinger\tocaraul-api\*') "$SshUser@$SshHost`:$uploadPath/"
+  AssertExit 'Envio do backend PHP'
+  $publish = "set -e; backup='$DeployPath/../public_html-backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')'; cp -a '$DeployPath' `"`$backup`"; rsync -a --delete --exclude 'api_config.php' --exclude '.tocaraul_admin.key' '$uploadPath/' '$DeployPath/'; rm -rf '$uploadPath'; echo 'php-release' > '$DeployPath/.tocaraul-release'; php -l '$DeployPath/index.php'; echo BACKUP:`"`$backup`""
+  & $plink -batch -P $SshPort -hostkey $hostKey -pw $Password "$SshUser@$SshHost" $publish
+  AssertExit 'Publicação do backend PHP'
 
   Step 'Verificando a aplicação publicada'
   $health = Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing -TimeoutSec 20
