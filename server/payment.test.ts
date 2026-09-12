@@ -29,7 +29,7 @@ describe("Pagar.me Pix split", () => {
     vi.stubGlobal("fetch", fetchMock);
     const provider = new PagarMePaymentProvider({ secretKey: "sk_test_123", platformRecipientId: "rp_platform" });
 
-    const payment = await provider.createPayment({ requestId: 42, amountCents: 500, description: "Música", venueRecipientId: "rp_venue" });
+    const payment = await provider.createPayment({ requestId: 42, amountCents: 500, description: "Música", venueRecipientId: "rp_venue", splitBarPercent: 50 });
 
     expect(payment).toEqual({ externalId: "or_123", status: "PENDING", pixCopyPaste: "pix-code" });
     const [, request] = fetchMock.mock.calls[0] as [string, RequestInit];

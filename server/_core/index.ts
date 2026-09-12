@@ -9,6 +9,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { registerDeviceRoutes } from "../deviceRoutes";
+import { markRequestQueuedAfterApprovedPayment, recordVenueEarning } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -38,6 +39,23 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerDeviceRoutes(app);
+  app.post("/api/webhooks/asaas", async (req, res) => {
+    const expectedToken = process.env.ASAAS_WEBHOOK_TOKEN;
+    const receivedToken = req.header("asaas-access-token");
+    if (!expectedToken || receivedToken !== expectedToken) {
+      res.status(401).json({ error: "Invalid Asaas webhook token" });
+      return;
+    }
+    const payment = req.body?.payment as { id?: string; externalReference?: string } | undefined;
+    const event = String(req.body?.event ?? "");
+    const match = payment?.externalReference?.match(/^tocaraul_(\d+)$/);
+    if ((event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED") && payment?.id && match) {
+      const requestId = Number(match[1]);
+      const queued = await markRequestQueuedAfterApprovedPayment(requestId, payment.id);
+      if (queued) await recordVenueEarning(requestId, payment.id);
+    }
+    res.status(200).json({ received: true });
+  });
   // tRPC API
   app.use(
     "/api/trpc",

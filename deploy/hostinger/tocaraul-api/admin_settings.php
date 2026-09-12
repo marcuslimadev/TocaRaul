@@ -14,4 +14,4 @@ function runtime_mp_access_token(): string { return runtime_setting('mercadopago
 function runtime_mp_public_key(): string { return runtime_setting('mercadopago_public_key','MERCADOPAGO_PUBLIC_KEY'); }
 function runtime_mp_webhook_secret(): string { return runtime_setting('mercadopago_webhook_secret','MERCADOPAGO_WEBHOOK_SECRET'); }
 function runtime_platform_percent(): int { $v=(int)runtime_setting('platform_percent','TOCARAUL_PLATFORM_PERCENT'); return $v>0&&$v<100?$v:30; }
-function runtime_youtube_api_key(): string { return runtime_setting('youtube_api_key','YOUTUBE_API_KEY'); }
+function runtime_youtube_api_key(): string { $v=runtime_setting('youtube_api_key','YOUTUBE_API_KEY'); return $v!==''?$v:runtime_setting('youtube_api_key','YOUTUBE_DATA_KEY'); }

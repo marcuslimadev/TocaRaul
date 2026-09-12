@@ -36,6 +36,78 @@ export class MockPaymentProvider implements PaymentProvider {
 
 export const mockPaymentProvider = new MockPaymentProvider();
 
+type AsaasPaymentResponse = {
+  id?: string;
+  status?: string;
+  billingType?: string;
+  pixQrCode?: { encodedImage?: string; payload?: string; expirationDate?: string };
+  encodedImage?: string;
+  payload?: string;
+};
+
+type AsaasCustomerResponse = { id?: string };
+
+function mapAsaasStatus(status?: string): PaymentStatus {
+  if (status === "RECEIVED" || status === "CONFIRMED") return "APPROVED";
+  if (status === "REFUNDED" || status === "REFUND_REQUESTED") return "CANCELLED";
+  if (status === "OVERDUE" || status === "DELETED") return "REJECTED";
+  return "PENDING";
+}
+
+/** Centralized Asaas provider: TocaRaul receives the charge; bar payouts happen later via Pix transfer. */
+export class AsaasPaymentProvider implements PaymentProvider {
+  private readonly apiKey: string;
+  private readonly baseUrl: string;
+
+  constructor(config = { apiKey: process.env.ASAAS_API_KEY, baseUrl: process.env.ASAAS_API_BASE_URL ?? "https://api-sandbox.asaas.com/v3" }) {
+    if (!config.apiKey) throw new Error("Asaas requires ASAAS_API_KEY");
+    this.apiKey = config.apiKey;
+    this.baseUrl = config.baseUrl.replace(/\/$/, "");
+    if (this.baseUrl !== "https://api-sandbox.asaas.com/v3") {
+      throw new Error("Asaas está restrito ao sandbox durante a homologação");
+    }
+  }
+
+  private async request<T>(path: string, init?: RequestInit): Promise<T> {
+    const response = await fetch(`${this.baseUrl}${path}`, { ...init, redirect: "error", signal: AbortSignal.timeout(25_000), headers: { access_token: this.apiKey, "Content-Type": "application/json", ...init?.headers } });
+    const data = await response.json().catch(() => ({})) as T & { errors?: Array<{ description?: string }> };
+    if (!response.ok) throw new Error(`Asaas request failed (${response.status}): ${data.errors?.[0]?.description ?? "unknown error"}`);
+    return data;
+  }
+
+  async createPayment(order: PaymentOrder): Promise<PaymentResult> {
+    if (!Number.isSafeInteger(order.amountCents) || order.amountCents <= 0) throw new Error("Valor Pix inválido");
+    const customer = process.env.ASAAS_DEFAULT_CUSTOMER_ID
+      ? { id: process.env.ASAAS_DEFAULT_CUSTOMER_ID }
+      : await this.request<AsaasCustomerResponse>("/customers", { method: "POST", body: JSON.stringify({ name: "Cliente TocaRaul", email: order.payerEmail ?? `cliente+${order.requestId}@tocaraul.local`, externalReference: `tocaraul_customer_${order.requestId}` }) });
+    if (!customer.id) throw new Error("Asaas did not return a customer id");
+    const payment = await this.request<AsaasPaymentResponse>("/payments", {
+      method: "POST",
+      body: JSON.stringify({
+        customer: customer.id,
+        billingType: "PIX",
+        value: order.amountCents / 100,
+        dueDate: new Date(Date.now() + 30 * 60 * 1000).toISOString().slice(0, 10),
+        description: order.description,
+        externalReference: `tocaraul_${order.requestId}`,
+      }),
+    });
+    if (!payment.id) throw new Error("Asaas did not return a payment id");
+    const pix = await this.request<AsaasPaymentResponse>(`/payments/${encodeURIComponent(payment.id)}/pixQrCode`);
+    if (!(pix.payload ?? pix.pixQrCode?.payload)) throw new Error("Asaas não retornou o código Pix");
+    return { externalId: payment.id, status: mapAsaasStatus(payment.status) === "APPROVED" ? "APPROVED" : "PENDING", pixCopyPaste: pix.payload ?? pix.pixQrCode?.payload };
+  }
+
+  async getPayment(externalId: string): Promise<PaymentStatus> {
+    const payment = await this.request<AsaasPaymentResponse>(`/payments/${encodeURIComponent(externalId)}`);
+    return mapAsaasStatus(payment.status);
+  }
+
+  async transferToPix(input: { valueCents: number; pixAddressKey: string; pixAddressKeyType: "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP"; externalReference: string; scheduleDate?: string }) {
+    return this.request<{ id: string; status?: string }>("/transfers", { method: "POST", body: JSON.stringify({ value: input.valueCents / 100, pixAddressKey: input.pixAddressKey, pixAddressKeyType: input.pixAddressKeyType, externalReference: input.externalReference, scheduleDate: input.scheduleDate }) });
+  }
+}
+
 type MercadoPagoPaymentResponse = {
   id?: number | string;
   status?: string;
@@ -80,7 +152,9 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
       }),
     });
     if (!data.id) throw new Error("Mercado Pago did not return a payment id");
-    return { externalId: String(data.id), status: mapMercadoPagoStatus(data.status), pixCopyPaste: data.point_of_interaction?.transaction_data?.qr_code };
+    const status = mapMercadoPagoStatus(data.status);
+    if (status === "REJECTED" || status === "CANCELLED") throw new Error("Mercado Pago payment was not accepted");
+    return { externalId: String(data.id), status, pixCopyPaste: data.point_of_interaction?.transaction_data?.qr_code };
   }
 
   async getPayment(externalId: string): Promise<PaymentStatus> {
@@ -176,6 +250,7 @@ export class PagarMePaymentProvider implements PaymentProvider {
 
 export function activePaymentProvider(): PaymentProvider {
   const provider = process.env.PAYMENT_PROVIDER?.toLowerCase();
+  if (provider === "asaas") return new AsaasPaymentProvider();
   if (provider === "pagarme") return new PagarMePaymentProvider();
   if (provider === "mercadopago") return new MercadoPagoPaymentProvider();
   return mockPaymentProvider;

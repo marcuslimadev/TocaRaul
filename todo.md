@@ -30,6 +30,20 @@
 - [ ] Implementar autenticação e permissões específicas do estabelecimento
 - [ ] Validar ponta a ponta com contas de teste do Mercado Pago antes da produção
 
+## Asaas centralizado — novo caminho
+
+- [x] Criar configuração local do Asaas Sandbox sem expor a chave no Git
+- [x] Adicionar provider Asaas para cobrança Pix centralizada
+- [x] Adicionar transferência Pix do saldo central para chave externa do bar
+- [x] Adicionar endpoint inicial de webhook Asaas para liberar pedido confirmado
+- [ ] Configurar token do webhook Asaas no ambiente publicado
+- [x] Criar ledger inicial de saldo do bar e idempotência por pagamento
+- [x] Implementar rotina diária de repasses com valor mínimo e idempotência
+- [x] Definir valor mínimo inicial de repasse em R$ 50,00 por bar
+- [ ] Agendar a rotina diária via cron/heartbeat
+- [x] Expor consulta protegida de saldo recebido/disponível/repassado
+- [ ] Mostrar saldo recebido, disponível, agendado e repassado no painel
+
 ## Histórico
 
 - [x] Documento de referência anexado: /home/ubuntu/upload/jukebox_mvp_especificacao.md
@@ -160,3 +174,5 @@
 
 - [ ] Sincronizar as alterações mais recentes do TocaRaul com marcuslimadev/TocaRaul
 - [ ] Confirmar o commit remoto atualizado no GitHub
+
+- [ ] Após a publicação, avaliar substituto ao Asaas para reduzir o custo de pedidos pequenos (música e dedicatória), comparando mínimo de cobrança, tarifa Pix, confirmação automática, estornos e repasses. Pedido do usuário em 10/09/2026.

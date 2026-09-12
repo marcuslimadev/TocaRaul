@@ -3,9 +3,9 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="true" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:allowBackup="true" android:banner="@mipmap/ic_launcher" android:icon="@mipmap/ic_launcher" android:label="@string/app_name" android:supportsRtl="true" android:theme="@style/Theme.TocaRaul">
-        <activity android:name=".PlaybackActivity" android:exported="false" android:screenOrientation="landscape" />
-        <activity android:name=".MainActivity" android:exported="true">
+    <application android:allowBackup="false" android:banner="@drawable/tv_banner" android:icon="@mipmap/ic_launcher" android:label="@string/app_name" android:supportsRtl="true" android:theme="@style/Theme.TocaRaul">
+        <activity android:name=".AboutActivity" android:exported="false" android:screenOrientation="landscape" />
+        <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

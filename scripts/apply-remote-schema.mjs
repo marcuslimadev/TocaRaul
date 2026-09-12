@@ -14,7 +14,7 @@ function readEnv(path) {
   );
 }
 
-const env = readEnv(".env.local");
+const env = { ...readEnv(".env.local"), ...process.env };
 if (!env.DATABASE_URL) throw new Error("DATABASE_URL is required in .env.local");
 
 const connection = await mysql.createConnection(env.DATABASE_URL);
@@ -42,8 +42,8 @@ await execute(`
     ownerId int NOT NULL,
     code varchar(16) NOT NULL,
     name varchar(120) NOT NULL,
-    musicPriceCents int NOT NULL DEFAULT 300,
-    dedicationPriceCents int NOT NULL DEFAULT 200,
+    musicPriceCents int NOT NULL DEFAULT 500,
+    dedicationPriceCents int NOT NULL DEFAULT 0,
     createdAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updatedAt timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY(id),
@@ -145,7 +145,7 @@ await connection.query(
   "INSERT IGNORE INTO users (id, openId, name, email, loginMethod, role) VALUES (1, 'local-owner', 'TocaRaul Owner', NULL, 'seed', 'admin')"
 );
 await connection.query(
-  "INSERT IGNORE INTO venues (id, ownerId, code, name, musicPriceCents, dedicationPriceCents, splitBarPercent, splitPlatformPercent) VALUES (1, 1, 'RAUL01', 'Bar do Centro', 300, 200, 70, 30)"
+  "INSERT IGNORE INTO venues (id, ownerId, code, name, musicPriceCents, dedicationPriceCents, splitBarPercent, splitPlatformPercent) VALUES (1, 1, 'RAUL01', 'Bar do Centro', 500, 0, 70, 30)"
 );
 
 await connection.end();
