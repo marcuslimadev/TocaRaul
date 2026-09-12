@@ -22,6 +22,7 @@ param(
   [string]$SshHost = '179.199.129.224',
   [int]$SshPort = 22,
   [string]$SshUser = 'root',
+  [string]$SshHostKey = 'ssh-ed25519 255 SHA256:jDm0EETU3mnrAT/lxjiunu3CJLeQf8iDBSHKlMWpt9s',
   [string]$Branch = 'main',
   [switch]$SkipCommit,
   [switch]$RemoteOnly,
@@ -46,8 +47,8 @@ function EnvValue([string]$Name) {
 function Bash([string]$Value) { return "'" + $Value.Replace("'", "'`"'`"'") + "'" }
 function OriginSshUrl {
   $url = (& git remote get-url origin).Trim(); AssertExit 'Leitura do remote origin'
-  if ($url -match '^git@[^:]+:.+\.git$') { return $url }
-  if ($url -match '^https://github\.com/([^/]+)/([^/]+?)(?:\.git)?$') { return "git@github.com:$($Matches[1])/$($Matches[2]).git" }
+  if ($url -match '^git@github\.com:(.+)$') { return "https://github.com/$($Matches[1])" }
+  if ($url -match '^https://github\.com/.+$') { return $url }
   throw "Remote origin não suportado: $url"
 }
 
@@ -74,8 +75,7 @@ $plink = @(
   (Join-Path ${env:LOCALAPPDATA} 'PuTTY\plink.exe')
 ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
 if (-not $plink) { throw 'PuTTY plink.exe não foi encontrado.' }
-$hostKey = EnvValue 'TOCARAUL_SSH_HOSTKEY'
-if ([string]::IsNullOrWhiteSpace($hostKey)) { $hostKey = 'ssh-ed25519 255 SHA256:xtNHQtoQDJLfhj35kMrGjFw8Sy8mzG6RPRWmTwL9w4c' }
+$hostKey = $SshHostKey
 
 try {
   if (-not $RemoteOnly) {
