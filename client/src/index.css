@@ -2,9 +2,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-:root { font-family: 'DM Sans', sans-serif; color: #f5f2f7; background: #111013; font-synthesis: none; --ink:#f5f2f7; --muted:#97929d; --soft:#c7c1cb; --line:#2c2930; --surface:#1a181d; --surface-2:#211e25; --violet:#a78bfa; --violet-2:#7757de; --green:#55d69b; --amber:#f5bf67; }
+:root { font-family: 'DM Sans', sans-serif; color: #171717; background: #f2eee5; font-synthesis: none; --ink:#171717; --muted:#69645c; --soft:#46423c; --line:#171717; --surface:#fffdf7; --surface-2:#e8e0d2; --violet:#1746a2; --violet-2:#1746a2; --green:#16805c; --amber:#f4c430; --bauhaus-red:#d9342b; --bauhaus-blue:#1746a2; --bauhaus-yellow:#f4c430; --bauhaus-paper:#f2eee5; }
 * { box-sizing:border-box; }
-body { margin:0; min-width:320px; background:#111013; }
+body { margin:0; min-width:320px; background:var(--bauhaus-paper); background-image: radial-gradient(circle at 92% 8%, var(--bauhaus-red) 0 52px, transparent 53px), linear-gradient(90deg, transparent 0 96%, var(--bauhaus-blue) 96% 100%); background-attachment:fixed; }
 button, input, textarea { font:inherit; }
 button { cursor:pointer; }
 button:focus-visible, input:focus-visible, textarea:focus-visible { outline:2px solid var(--violet); outline-offset:3px; }
@@ -68,3 +68,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline:2px 
 .print-page strong { color: #ffd12f; font-size: .88rem; }
 .print-action { margin-top: 12px; }
 @media print { .print-page { min-height: auto; padding: 16mm; color: #111; background: #fff; } .print-page .brand-lockup { color: #111; } .print-page .brand-lockup span, .print-page p { color: #444; } .print-venue { border-color: #111; color: #111; } .print-page strong { color: #111; } .print-action { display: none; } }
+
+/* Bauhaus system: primary geometry, high-contrast ink and three bold accents. */
+.app-shell { background: transparent; }
+.app-sidebar, .topbar { background: rgba(242,238,229,.94); border-color: var(--line); }
+.app-sidebar { border-right-width: 3px; }
+.brand-mark { border-radius: 50%; background: var(--bauhaus-red); color: #fffdf7; box-shadow: 6px 6px 0 var(--bauhaus-blue); }
+.brand-lockup strong, .page-heading h1, .panel-heading h2, .client-hero h1, .tv-title-row h2 { color: var(--ink); }
+.nav-item { color: #5f5b54; border-radius: 0; }
+.nav-item:hover, .nav-item.active { color: var(--ink); background: var(--bauhaus-yellow); box-shadow: none; }
+.nav-item.active svg { color: var(--ink); }
+.venue-chip, .panel, .metric-card, .song-card, .search-field, .access-modal, .request-modal { background: var(--surface); border-color: var(--line); border-radius: 0; box-shadow: 5px 5px 0 rgba(23,23,23,.14); }
+.primary-button, .song-ask, .category-chip.active { background: var(--bauhaus-red); border-color: var(--bauhaus-red); color: #fffdf7; border-radius: 0; box-shadow: 4px 4px 0 var(--bauhaus-blue); }
+.outline-button { color: var(--ink); border-color: var(--line); border-radius: 0; }
+.outline-button:hover { background: var(--bauhaus-blue); color: #fff; border-color: var(--bauhaus-blue); }
+.section-kicker, .nav-label, .eyebrow { color: var(--bauhaus-blue); }
+.live-indicator { background: var(--bauhaus-red); box-shadow: 0 0 0 3px rgba(217,52,43,.2); }
+.song-card:hover { border-color: var(--bauhaus-blue); background: #fff; transform: translateX(3px); }

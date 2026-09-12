@@ -81,6 +81,10 @@ try {
   if (-not $RemoteOnly) {
     Step 'Validando o projeto'
     & git diff --check; AssertExit 'Verificação de formatação do Git'
+    Step 'Compilando o bundle de produção'
+    $env:NODE_ENV = 'production'
+    & pnpm install --frozen-lockfile --allow-build=esbuild --allow-build=@tailwindcss/oxide; AssertExit 'Instalação das dependências'
+    & pnpm build; AssertExit 'Build de produção'
     if (-not $SkipCommit) {
       & git fetch origin $Branch; AssertExit 'Atualização das referências remotas'
       $behind = [int](& git rev-list --count "HEAD..origin/$Branch"); AssertExit 'Verificação da branch remota'
@@ -106,10 +110,21 @@ repo_url=$repoUrl
 branch=$branchName
 command -v git >/dev/null
 command -v rsync >/dev/null
+command -v pnpm >/dev/null
 mkdir -p "`$(dirname "`$repo_path")"
 if [ ! -d "`$repo_path/.git" ]; then git clone --branch "`$branch" "`$repo_url" "`$repo_path"; else git -C "`$repo_path" fetch origin "`$branch"; git -C "`$repo_path" checkout -B "`$branch" "origin/`$branch"; git -C "`$repo_path" reset --hard "origin/`$branch"; fi
+cd "`$repo_path"
+NODE_ENV=production pnpm install --frozen-lockfile --allow-build=esbuild --allow-build=@tailwindcss/oxide
+NODE_ENV=production pnpm build
 mkdir -p "`$deploy_path"
-rsync -a --delete --exclude '.git/' --exclude '.env*' "`$repo_path/" "`$deploy_path/"
+rsync -a --delete \
+  --exclude '.git/' --exclude '.env*' --exclude 'node_modules/' --exclude 'Android/' \
+  --exclude 'client/' --exclude 'drizzle/' --exclude 'docs/' --exclude 'scripts/' \
+  --exclude 'tmp/' --exclude 'dist/public/' \
+  "`$repo_path/" "`$deploy_path/"
+mkdir -p "`$deploy_path/public"
+rsync -a --delete "`$repo_path/dist/public/" "`$deploy_path/public/"
+test -f "`$deploy_path/dist/index.js"
 printf '%s\n' "`$(git -C "`$repo_path" rev-parse HEAD)" > "`$deploy_path/.tocaraul-release"
 echo "Deploy concluído: `$(cat "`$deploy_path/.tocaraul-release")"
 "@
