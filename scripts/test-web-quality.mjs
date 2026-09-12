@@ -110,12 +110,12 @@ try {
   assert.ok(logoInput, 'the panel must offer a logo upload');
   await logoInput.uploadFile(path.resolve(logoFile));
   await submit(owner, 'logo');
-  const logoSrc = await owner.$eval('#stage img[src^="/assets/logos/"]', (e) => e.getAttribute('src'));
+  const logoSrc = await owner.$eval('#stage .plate img[src^="/assets/logos/"]', (e) => e.getAttribute('src'));
   assert.ok(logoSrc, 'the bar logo must show on the stage');
   log('logo_on_stage', {logoSrc});
 
   // ---- the stage carries the written dedication and the order QR next to the player ----
-  const sideQr = await owner.$$eval('#stageSide #stageQr canvas, #stageSide #stageQr img', (els) => els.length);
+  const sideQr = await owner.$$eval('#stage .side .qr canvas, #stage .side .qr img', (els) => els.length);
   assert.ok(sideQr >= 1, 'the stage must show the order QR code beside the player');
   await owner.click("#stageBtn");
   await owner.waitForFunction(() => document.getElementById("ytmount")?.classList.contains("on"), {timeout: 30000});
