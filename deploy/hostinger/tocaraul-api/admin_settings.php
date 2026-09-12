@@ -17,3 +17,40 @@ function runtime_mp_public_key(): string { return runtime_setting('mercadopago_p
 function runtime_mp_webhook_secret(): string { return runtime_setting('mercadopago_webhook_secret','MERCADOPAGO_WEBHOOK_SECRET'); }
 function runtime_platform_percent(): int { $v=(int)runtime_setting('platform_percent','TOCARAUL_PLATFORM_PERCENT'); return $v>0&&$v<100?$v:30; }
 function runtime_youtube_api_key(): string { $v=runtime_setting('youtube_api_key','YOUTUBE_API_KEY'); return $v!==''?$v:runtime_setting('youtube_api_key','YOUTUBE_DATA_KEY'); }
+
+/*
+ * Cache de estado da tela do bar.
+ *
+ * O plano da Hostinger limita o usuario do banco a 500 conexoes por hora, e o
+ * painel fica aberto a noite inteira perguntando "o que toca agora?". Sem cache,
+ * um unico bar estoura o limite e o site responde 500 para todo mundo.
+ *
+ * A regra e simples: quem escreve (pedido pago, comando do dono, musica que
+ * acabou) apaga o arquivo do bar; o proximo poll vai ao banco e reescreve. Entre
+ * uma escrita e outra o poll responde do disco, sem abrir conexao nenhuma.
+ */
+function state_cache_dir(): string { return dirname(__DIR__).'/cache'; }
+function state_cache_file(string $name): string { return state_cache_dir().'/'.$name.'.json'; }
+
+function state_cache_read(string $name, int $maxAgeSeconds): ?array {
+ $file=state_cache_file($name);
+ if(!is_file($file))return null;
+ $age=time()-(int)@filemtime($file);
+ if($age<0||$age>$maxAgeSeconds)return null;
+ $raw=@file_get_contents($file);
+ if(!is_string($raw)||$raw==='')return null;
+ $data=json_decode($raw,true);
+ return is_array($data)?$data:null;
+}
+
+function state_cache_write(string $name, array $data): void {
+ $dir=state_cache_dir();
+ if(!is_dir($dir)&&!@mkdir($dir,0700,true))return;
+ $file=state_cache_file($name);
+ $tmp=$file.'.'.getmypid().'.tmp';
+ if(@file_put_contents($tmp,json_encode($data,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE))===false)return;
+ if(!@rename($tmp,$file))@unlink($tmp);
+}
+
+/** Chamado por quem muda a fila, a playlist ou manda um comando. */
+function invalidate_venue_state(int $venueId): void { if($venueId>0)@unlink(state_cache_file('venue_'.$venueId)); }

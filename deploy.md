@@ -131,13 +131,22 @@ servidor", confira a permissão de escrita de `public_html/assets`.
 
 O plano limita o usuário do banco a **500 conexões por hora** — estourar devolve
 `SQLSTATE[HY000] [1226] ... max_connections_per_hour` e o site inteiro responde
-500 até virar a hora. Duas defesas no código:
+500 até virar a hora. Um painel aberto a noite toda estoura isso sozinho, então:
 
-- `settings_db()` abre a conexão com `PDO::ATTR_PERSISTENT`, então os workers do
-  PHP-FPM reaproveitam a mesma conexão em vez de abrir uma por requisição.
 - O painel faz **um** pedido por ciclo: `/api/device/state` devolve estado,
   registra o heartbeat e entrega o comando PLAY/PAUSE/SKIP pendente. O ciclo é
   de 2s enquanto toca e 5s parado.
+- Esse pedido normalmente **não abre conexão nenhuma**: a resposta fica em
+  `~/domains/tocaraul.lojadaesquina.store/cache/venue_<id>.json` por até 20s.
+  Quem escreve (pagamento aprovado, comando do dono, música que acabou, playlist
+  alterada) apaga o arquivo, e o próximo poll vai ao banco e reescreve — por isso
+  um PAUSE continua chegando na hora.
+- A pasta `cache/` fica **fora** do `public_html`, é criada pelo próprio PHP e
+  pode ser apagada a qualquer momento: ela se refaz sozinha.
+
+**Não use `PDO::ATTR_PERSISTENT`.** Já foi tentado: troca o limite por hora pelo
+de conexões *simultâneas*, cada worker do PHP-FPM passa a segurar uma conexão, e
+o site cai com 504 em vez de 500.
 
 Se voltar a estourar, o sintoma aparece assim (o log fica só no stderr do PHP):
 

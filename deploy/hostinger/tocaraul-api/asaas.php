@@ -69,6 +69,8 @@ function asaas_reconcile(string $externalId):array {
             $d->prepare("UPDATE songRequests SET status='CANCELLED' WHERE id=? AND status IN ('AWAITING_PAYMENT','QUEUED')")->execute([$req['id']]);
             $d->prepare("UPDATE financeLedger SET balanceStatus='CANCELLED' WHERE paymentId=? AND type='SALE'")->execute([$pay['id']]);
         }
-        $d->commit();return ['ok'=>true,'providerStatus'=>$state];
+        $d->commit();
+        invalidate_venue_state((int)$req['venueId']);
+        return ['ok'=>true,'providerStatus'=>$state];
     }catch(Throwable $e){$d->rollBack();throw $e;}
 }

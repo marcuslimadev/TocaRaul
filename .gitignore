@@ -123,3 +123,6 @@ client/public/__manus__/version.json
 
 # Logos enviadas pelos bares ficam só no servidor
 deploy/hostinger/tocaraul-api/assets/logos/
+
+# Cache de estado gerado pelo PHP (fica fora do public_html)
+deploy/hostinger/cache/
