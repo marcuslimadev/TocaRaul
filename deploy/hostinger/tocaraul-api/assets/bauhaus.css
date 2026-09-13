@@ -65,3 +65,8 @@ body{background-image:none}
 .bh-panel button{border:1px solid var(--red);border-radius:6px;box-shadow:none;font-weight:700;text-transform:none}
 .bh-panel button:active{transform:translateY(1px);box-shadow:none}
 .bh-stage{border:1px solid var(--ink);box-shadow:none}
+
+/* A dedicatória precisa ser lida de longe e ficar viva dentro do próprio bloco. */
+@keyframes dedication-sway{0%,100%{transform:translateX(-7px) rotate(-1deg)}50%{transform:translateX(7px) rotate(1deg)}}
+.bh-stage .ded p{font-size:clamp(13px,1.8vw,32px);line-height:1.12;max-width:100%;animation:dedication-sway 1.8s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.bh-stage .ded p{animation:none}}
