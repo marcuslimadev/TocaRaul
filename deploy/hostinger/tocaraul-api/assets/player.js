@@ -138,9 +138,10 @@
           if (opts.onOnline) opts.onOnline(state);
           paint(state);
           applyCommand(state.command);
-          // Pedido pago/bonificado tem prioridade imediata: interrompe a
-          // música atual para que o próximo claim pegue o pedido da fila.
-          if (currentlyPlaying && state.queueSize > 0 && pendingRequestId && !pendingResult) {
+          // Pedido pago/bonificado interrompe apenas música gratuita
+          // (playlist ou histórico aleatório). Uma música paga já iniciada
+          // termina normalmente e não é cortada por outro pedido pago.
+          if (currentlyPlaying && state.queueSize > 0 && pendingRequestId < 0 && !pendingResult) {
             finishPlayback('SKIPPED');
           }
           if (pendingRequestId && pendingResult) {

@@ -108,7 +108,7 @@ function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}?><!docty
 </div>
 <?php endif;?></div>
 <?php if($v):?>
-<script src="/assets/player.js?v=20260913-3"></script>
+<script src="/assets/player.js?v=20260913-4"></script>
 <script>
 const stage=document.getElementById('stage'),mount=document.getElementById('ytmount'),idle=document.getElementById('stageIdle'),gate=document.getElementById('stageStart');
 const screen=TocaRaulPlayer({
