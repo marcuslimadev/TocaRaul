@@ -42,11 +42,24 @@ try {
  assert.equal(afterCommand.command,null,'o comando so pode ser entregue uma vez');
  const [[seen]]=await db.query('SELECT status,lastSeenAt FROM devices WHERE deviceToken=?',[player.deviceToken]);
  assert.equal(seen.status,'ONLINE','o proprio state faz as vezes de heartbeat');
+ // O laco inteiro de "pular": o painel pega a musica, recebe o comando e devolve SKIPPED.
+ const claimed=await api('/api/player/claim',{},player.deviceToken);
+ assert.ok(claimed.track?.id,'o painel precisa conseguir pegar a musica paga da fila');
+ await fetch(base+'/bar',{method:'POST',headers:{Cookie:ownerCookie,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({a:'cmd',csrf:ownerCsrf,cmd:'SKIP'}),redirect:'manual'});
+ const comPular=await api('/api/device/state',null,player.deviceToken);
+ assert.equal(comPular.command,'SKIP','o pular do dono precisa chegar ao painel');
+ assert.equal(comPular.nowPlaying?.id,String(claimed.track.id),'a musica pega precisa aparecer como tocando');
+ await api('/api/player/complete',{requestId:parseInt(claimed.track.id,10),result:'SKIPPED'},player.deviceToken);
+ const depoisDoPular=await api('/api/commerce/payment?requestId='+order.requestId);
+ assert.equal(depoisDoPular.requestStatus,'SKIPPED','a musica pulada precisa sair da fila');
+ const filaVazia=await api('/api/device/state',null,player.deviceToken);
+ assert.equal(filaVazia.queueSize,0,'depois de pular, a fila paga fica vazia');
+ assert.equal(filaVazia.nowPlaying,null,'depois de pular, nada fica marcado como tocando');
  const adminPassword=randomBytes(18).toString('base64url');const hash=execFileSync('C:/xampp/php/php.exe',['-r','echo password_hash($argv[1], PASSWORD_DEFAULT);',adminPassword],{encoding:'utf8'});
  await fetch(base+'/admin');await db.execute("INSERT INTO adminUsers(username,passwordHash,mustChangePassword) VALUES('e2e_admin',?,0) ON DUPLICATE KEY UPDATE passwordHash=VALUES(passwordHash)",[hash]);
  page=await fetch(base+'/admin');const ac=page.headers.get('set-cookie').split(';')[0];html=await page.text();const at=html.match(/name="csrf" value="([^"]+)"/)[1];
  page=await fetch(base+'/admin',{method:'POST',headers:{Cookie:ac,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({action:'login',csrf:at,username:'e2e_admin',password:adminPassword}),redirect:'manual'});assert.equal(page.status,302);
  const adminCookie=page.headers.get('set-cookie')?.split(';')[0]??ac;html=await (await fetch(base+'/admin',{headers:{Cookie:adminCookie}})).text();assert.ok(html.includes('Asaas sandbox e ambiente'));
  fs.mkdirSync('tmp',{recursive:true});fs.writeFileSync('tmp/e2e-session.json',JSON.stringify({bar,order,password,ownerCookie,adminCookie,adminPassword},null,2));
- console.log(JSON.stringify({ok:true,venue:bar.venue,requestId:order.requestId,paymentStatus:confirmed.paymentStatus,requestStatus:confirmed.requestStatus,ledgerEntries:entries.length,barCents:entries[0].barCents,ownerPanel:true,adminPanel:true,duplicateWebhook:true,webhookDelivery:'local authenticated replay after real sandbox confirmation',ownerCommandOnStatePoll:true},null,2));
+ console.log(JSON.stringify({ok:true,venue:bar.venue,requestId:order.requestId,paymentStatus:confirmed.paymentStatus,requestStatus:confirmed.requestStatus,ledgerEntries:entries.length,barCents:entries[0].barCents,ownerPanel:true,adminPanel:true,duplicateWebhook:true,webhookDelivery:'local authenticated replay after real sandbox confirmation',ownerCommandOnStatePoll:true,skipLoop:'claim -> SKIP -> complete -> fila vazia'},null,2));
 } finally {await db.end();}

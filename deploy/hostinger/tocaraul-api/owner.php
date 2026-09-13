@@ -32,6 +32,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){try{if(!hash_equals($_SESSION['csrf'],(s
  if($a==='song_add'){$video=trim((string)($_POST['banVideo']??''));if(!preg_match('/^[A-Za-z0-9_-]{11}$/',$video))throw new RuntimeException('ID de vídeo do YouTube inválido (11 caracteres).');moderation_schema();d()->prepare('INSERT IGNORE INTO venueBlockedSongs(venueId,providerId,title,artist) VALUES(?,?,?,?)')->execute([$vid,'youtube:'.$video,trim((string)($_POST['title']??''))?:null,trim((string)($_POST['artist']??''))?:null]);}
  if($a==='song_del'){moderation_schema();d()->prepare('DELETE FROM venueBlockedSongs WHERE id=? AND venueId=?')->execute([(int)($_POST['id']??0),$vid]);}
  if($a==='song_ban'){$rid=(int)($_POST['id']??0);$q=d()->prepare('SELECT providerId,title,artist FROM songRequests WHERE id=? AND venueId=? LIMIT 1');$q->execute([$rid,$vid]);if($r=$q->fetch()){moderation_schema();d()->prepare('INSERT IGNORE INTO venueBlockedSongs(venueId,providerId,title,artist) VALUES(?,?,?,?)')->execute([$vid,$r['providerId'],$r['title'],$r['artist']]);d()->prepare("UPDATE songRequests SET status='SKIPPED' WHERE id=? AND venueId=? AND status IN('QUEUED','PLAYING')")->execute([$rid,$vid]);d()->prepare('INSERT INTO tvCommands(venueId,command) VALUES(?,?)')->execute([$vid,'SKIP']);invalidate_venue_state($vid);}}
+ // Os controles do palco mandam o comando sem sair da pagina: responder 204 evita o redirect.
+ // Com 204 o Chrome marca o pedido como abortado mesmo tendo dado certo; devolve corpo.
+ if(($_SERVER['HTTP_X_REQUESTED_WITH']??'')==='fetch'){header('Content-Type: application/json');echo '{"ok":true}';exit;}
  header('Location:/bar');exit;}catch(Throwable $e){$err=$e->getMessage();}}
 $v=null;$list=[];$paid=[];if(!empty($_SESSION['venue'])){$q=d()->prepare('SELECT * FROM venues WHERE id=?');$q->execute([(int)$_SESSION['venue']]);$v=$q->fetch();$q=d()->prepare("SELECT * FROM barPlaylist WHERE venueId=? AND status='QUEUED' ORDER BY position,id");$q->execute([(int)$_SESSION['venue']]);$list=$q->fetchAll();$q=d()->prepare("SELECT id,providerId,title,artist,tableCode,status FROM songRequests WHERE venueId=? AND status IN('QUEUED','PLAYING') ORDER BY status='PLAYING' DESC,queuePosition");$q->execute([(int)$_SESSION['venue']]);$paid=$q->fetchAll();$words=venue_blocked_words((int)$_SESSION['venue']);$songs=venue_blocked_songs((int)$_SESSION['venue']);}
 $words=$words??[];$songs=$songs??[];$tvs=[];$tables=[];
@@ -64,6 +67,8 @@ function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}?><!docty
   <div class=ded><em>Dedicatória</em><p id=pDedication></p></div>
   <div class=qr><div class=code id=stageQr></div><span>Peça sua música</span></div>
  </div>
+ <div id=stageChip class=chip>0 na fila</div>
+ <div id=stageFlash class=flash><em>Pedido pago · entrou na fila</em><b id=flashSong></b><span id=flashWho></span></div>
  <div id=stageStart class=gate>
   <b>Ligar a tela do bar</b>
   <p>Um clique libera o som (exigência do navegador). Depois é só deixar aberto: a fila paga toca sozinha.</p>
@@ -80,7 +85,7 @@ function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}?><!docty
 <form method=post enctype="multipart/form-data" class=row style="flex:1;gap:8px"><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=logo><input type=file name=logo accept="image/png,image/jpeg,image/webp" required style="flex:1;margin:0"><button>Salvar logo</button></form>
 </div></div>
 <div class=c><h2>QR Code para pedidos</h2><p class=muted>Imprima ou compartilhe este único QR Code. O cliente escaneia, escolhe a música e faz o pedido.</p><div id=barQr style="background:#fff;width:232px;height:232px;padding:8px;border:3px solid #171717;box-shadow:6px 6px 0 #171717"></div><p><a style="color:var(--blue)" href="<?=h($tables?'/j/'.$tables[0]['qrToken']:'#')?>" target=_blank>Testar link de pedidos</a> · <button type=button class=alt onclick="window.print()">Imprimir QR</button></p><script src="/assets/qrcode.js"></script><script>const qrUrl=<?=json_encode($barQrUrl,JSON_UNESCAPED_SLASHES)?>;new QRCode(document.getElementById('barQr'),{text:qrUrl,width:216,height:216});new QRCode(document.getElementById('stageQr'),{text:qrUrl,width:320,height:320});</script></div>
-<div class=grid><div class=c><h2>Controle da tela</h2><div class=row><?php foreach(['PLAY'=>'▶ Tocar','PAUSE'=>'⏸ Pausar','SKIP'=>'⏭ Pular'] as $x=>$label):?><form method=post><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=cmd><input type=hidden name=cmd value=<?=$x?>><button><?=$label?></button></form><?php endforeach;?></div><form method=post><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=announce><label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer"><input type=checkbox name=on value=1 style="width:auto" <?=!empty($v['announceDedication'])?'checked':''?> onchange="this.form.submit()"> Anunciar dedicatória com voz antes da música</label></form><h3>Pedidos pagos — prioridade</h3><?php if(!$paid):?><p class=muted>Nenhum pedido pago aguardando.</p><?php endif;foreach($paid as $p):?><div class="item paid row"><div style="flex:1"><b><?=h($p['title'])?></b> · <?=h($p['artist'])?> <span class=muted><?=h($p['status'])?></span></div><form method=post onsubmit="return confirm('Banir esta música no seu bar e pular agora?')"><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=song_ban><input type=hidden name=id value=<?=(int)$p['id']?>><button title="Banir esta música e pular">⛔</button></form></div><?php endforeach;?></div><div class=c><h2>Recebimento · sandbox</h2><p>Disponível: <b><?=money($balance['available'])?></b></p><p>A receber: <b><?=money($balance['pending'])?></b></p><p>Mínimo para repasse: <b>R$ 50,00</b></p><p class=muted>Repasses automáticos em homologação. Nenhuma transferência real é feita.</p><p class=muted>O bar pode usar chave Pix de qualquer banco.</p><form method=post><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=pix><select name=type><?php foreach(['CPF','CNPJ','EMAIL','PHONE','EVP'] as $type):?><option value="<?=$type?>" <?=$v['pixKeyType']===$type?'selected':''?>><?=$type?></option><?php endforeach;?></select><input name=pix value="<?=h($v['pixKey'])?>" required><button>Salvar chave Pix</button></form></div></div><div class=c><h2>Playlist do bar</h2><p class=muted>Ela toca somente quando não houver pedido pago. Um pedido comprado assume a próxima posição automaticamente.</p>
+<div class=grid><div class=c><h2>Controle da tela</h2><div class=row><?php foreach(['PLAY'=>'▶ Tocar','PAUSE'=>'⏸ Pausar','SKIP'=>'⏭ Pular'] as $x=>$label):?><form method=post class=cmdForm><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=cmd><input type=hidden name=cmd value=<?=$x?>><button><?=$label?></button></form><?php endforeach;?></div><form method=post><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=announce><label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer"><input type=checkbox name=on value=1 style="width:auto" <?=!empty($v['announceDedication'])?'checked':''?> onchange="this.form.submit()"> Anunciar dedicatória com voz antes da música</label></form><h3>Pedidos pagos — prioridade</h3><div id=paidList><?php if(!$paid):?><p class=muted>Nenhum pedido pago aguardando.</p><?php endif;foreach($paid as $p):?><div class="item paid"><div style="flex:1"><b><?=h($p['title'])?></b><div class=muted><?=h($p['artist'])?><?=$p['status']==='PLAYING'?' · tocando':''?></div></div></div><?php endforeach;?></div><form method=post id=banTemplate style="display:none" onsubmit="return confirm('Banir esta música no seu bar e pular agora?')"><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=song_ban><input type=hidden name=id value=0><button title="Banir esta música e pular">⛔</button></form></div><div class=c><h2>Recebimento · sandbox</h2><p>Disponível: <b><?=money($balance['available'])?></b></p><p>A receber: <b><?=money($balance['pending'])?></b></p><p>Mínimo para repasse: <b>R$ 50,00</b></p><p class=muted>Repasses automáticos em homologação. Nenhuma transferência real é feita.</p><p class=muted>O bar pode usar chave Pix de qualquer banco.</p><form method=post><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=pix><select name=type><?php foreach(['CPF','CNPJ','EMAIL','PHONE','EVP'] as $type):?><option value="<?=$type?>" <?=$v['pixKeyType']===$type?'selected':''?>><?=$type?></option><?php endforeach;?></select><input name=pix value="<?=h($v['pixKey'])?>" required><button>Salvar chave Pix</button></form></div></div><div class=c><h2>Playlist do bar</h2><p class=muted>Ela toca somente quando não houver pedido pago. Um pedido comprado assume a próxima posição automaticamente.</p>
 <input id=plSearch placeholder="Buscar música no YouTube (ex: Tim Maia Você)" autocomplete=off>
 <div id=plResults></div>
 <form method=post id=plAdd style="display:none"><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=add><input type=hidden name=video><input type=hidden name=title><input type=hidden name=artist></form>
@@ -110,10 +115,78 @@ const screen=TocaRaulPlayer({
  venueId:<?=(int)$v['id']?>,mount,screenName:'Painel do bar',
  ui:{title:'pTitle',artist:'pArtist',dedication:'pDedication',queue:'pQueue'},
  onNeedsLogin:()=>location.reload(),
+ onState:paintQueue,
 });
+window.TocaRaulScreen=screen;
 new MutationObserver(()=>{const on=mount.classList.contains('on');mount.style.display=on?'block':'none';idle.style.display=on?'none':'flex'}).observe(mount,{attributes:true,attributeFilter:['class']});
 document.getElementById('stageBtn').onclick=()=>{screen.begin();gate.style.display='none'};
 document.getElementById('fsBtn').onclick=()=>{document.fullscreenElement?document.exitFullscreen():stage.requestFullscreen?.().catch(()=>{})};
+
+// Quem pagou precisa ver que algo aconteceu — e a tela do bar costuma estar em
+// tela cheia, entao o aviso e o contador moram dentro do palco, nao embaixo dele.
+const chip=document.getElementById('stageChip'),flash=document.getElementById('stageFlash');
+const flashSong=document.getElementById('flashSong'),flashWho=document.getElementById('flashWho');
+const paidList=document.getElementById('paidList');
+let known=null,flashTimer=0;
+
+function paintQueue(state){
+ const queue=state.queue||[];
+ const paid=queue.filter(i=>i.status==='QUEUED');
+ chip.textContent=paid.length===1?'1 na fila':paid.length+' na fila';
+
+ // Na primeira leitura so registramos o que ja estava la: avisar tudo de uma vez nao ajuda ninguem.
+ const ids=new Set(queue.map(i=>i.id));
+ if(known===null){known=ids;renderPaid(queue);return}
+ const novos=queue.filter(i=>!known.has(i.id)&&i.status==='QUEUED');
+ known=ids;
+ renderPaid(queue);
+ if(novos.length)announce(novos[novos.length-1]);
+}
+
+function announce(pedido){
+ flashSong.textContent=pedido.title+(pedido.artist?' · '+pedido.artist:'');
+ flashWho.textContent=pedido.visitorName?'Pedido de '+pedido.visitorName:'';
+ flash.classList.add('on');
+ clearTimeout(flashTimer);
+ flashTimer=setTimeout(()=>flash.classList.remove('on'),14000);
+}
+
+function renderPaid(queue){
+ if(!paidList)return;
+ paidList.textContent='';
+ if(!queue.length){const p=document.createElement('p');p.className='muted';p.textContent='Nenhum pedido pago aguardando.';paidList.append(p);return}
+ for(const pedido of queue){
+  const row=document.createElement('div');row.className='item paid';
+  const info=document.createElement('div');info.style.flex='1';
+  const t=document.createElement('b');t.textContent=pedido.title;
+  const a=document.createElement('div');a.className='muted';
+  a.textContent=(pedido.artist||'')+(pedido.visitorName?' · pedido de '+pedido.visitorName:'')+(pedido.status==='PLAYING'?' · tocando':'');
+  info.append(t,a);
+  row.append(info);
+  const form=document.getElementById('banTemplate');
+  if(form){
+   const clone=form.cloneNode(true);clone.removeAttribute('id');clone.style.display='';
+   clone.querySelector('[name=id]').value=pedido.id;
+   clone.onsubmit=()=>confirm('Banir esta música no seu bar e pular agora?');
+   row.append(clone);
+  }
+  paidList.append(row);
+ }
+}
+
+// Tocar/Pausar/Pular nao podem recarregar a pagina: o proprio painel e o player,
+// recarregar mataria a musica e traria de volta a tela de "Comecar". Sem JS, o
+// formulario continua funcionando do jeito antigo.
+for(const form of document.querySelectorAll('.cmdForm')){
+ form.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const botao=form.querySelector('button'),texto=botao.textContent;
+  botao.disabled=true;botao.textContent='enviando...';
+  try{await fetch('/bar',{method:'POST',body:new FormData(form),headers:{'X-Requested-With':'fetch'}})}catch(x){}
+  botao.textContent=texto;botao.disabled=false;
+ });
+}
+
 screen.run();
 
 // The panel searches the same catalogue the customer sees, so the bar's blocklist applies here too.

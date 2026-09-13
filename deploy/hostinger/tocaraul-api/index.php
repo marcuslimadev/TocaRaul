@@ -43,7 +43,7 @@ if($method==='GET'&&$path==='/api/device/state'){
   $state=['connection'=>'ONLINE',
    'venue'=>$venue?['id'=>(int)$venue['id'],'name'=>$venue['name'],'code'=>$venue['code'],'announceDedication'=>(int)($venue['announceDedication']??1)===1]:null,
    'nowPlaying'=>$playing?['id'=>(string)$playing['id'],'providerId'=>$playing['providerId'],'title'=>$playing['title'],'artist'=>$playing['artist'],'message'=>$playing['message'],'tableCode'=>$playing['tableCode']]:null,
-   'queue'=>array_map(fn($i)=>['title'=>$i['title'],'artist'=>$i['artist'],'message'=>$i['message'],'visitorName'=>$i['visitorName'],'tableCode'=>$i['tableCode'],'status'=>$i['status']],$queue),
+   'queue'=>array_map(fn($i)=>['id'=>(string)$i['id'],'title'=>$i['title'],'artist'=>$i['artist'],'message'=>$i['message'],'visitorName'=>$i['visitorName'],'tableCode'=>$i['tableCode'],'status'=>$i['status']],$queue),
    'queueSize'=>count(array_filter($queue,fn($i)=>$i['status']==='QUEUED')),
    'qrCodeUrl'=>public_base_url().'/j/'.$table['qrToken'],
    'playbackState'=>$playing?'PLAYING':'IDLE'];

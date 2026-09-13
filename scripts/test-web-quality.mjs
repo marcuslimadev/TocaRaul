@@ -45,6 +45,11 @@ try {
   assert.ok(venueCode, 'panel must show the bar code');
   log('signed_up', {venueCode});
 
+  // Os controles do palco nao navegam: mandam o comando e ficam na pagina.
+  const comando = (page, cmd) => page.evaluate((c) => {
+    document.querySelector(`.cmdForm [name=cmd][value=${c}]`).closest('form').requestSubmit();
+  }, cmd);
+
   const submit = (page, action) => Promise.all([
     page.waitForNavigation({waitUntil: 'networkidle0'}),
     page.evaluate((a) => [...document.querySelectorAll('form')].find((f) => f.querySelector(`[name=a][value=${a}]`)).requestSubmit(), action),
@@ -132,6 +137,81 @@ try {
   const shown = await owner.$eval('#pDedication', (e) => e.textContent.trim());
   if (messageField) assert.ok(shown.includes(dedication), `the stage must keep the dedication on screen, got "${shown}"`);
   log("panel_playing", {iframe: playing?.slice(0, 60), dedication: shown});
+
+  // ---------- quem pagou precisa ver que algo aconteceu, inclusive em tela cheia ----------
+  // Tudo o que avisa mora dentro de #stage; se estiver fora, a tela cheia engole.
+  const dentroDoPalco = await owner.evaluate(() => {
+    const stage = document.getElementById('stage');
+    return {
+      aviso: stage.contains(document.getElementById('stageFlash')),
+      contador: stage.contains(document.getElementById('stageChip')),
+    };
+  });
+  assert.ok(dentroDoPalco.aviso && dentroDoPalco.contador, `aviso e contador precisam viver dentro do palco: ${JSON.stringify(dentroDoPalco)}`);
+
+  // Um segundo pedido pago, agora com o painel ja aberto: o aviso tem de acender sozinho.
+  let segundo = null;
+  const primeiroId = order.requestId; // o listener original sobrescreve `order`; guarde antes
+  phone.on('response', async (r) => {
+    if (r.url().endsWith('/api/commerce/request') && r.request().method() === 'POST') { try { const j = await r.json(); if (j.requestId !== primeiroId) segundo = j; } catch {} }
+  });
+  await phone.bringToFront();
+  await phone.reload({waitUntil: 'networkidle0'});
+  await phone.type('#search', 'Raul Seixas Maluco Beleza');
+  await phone.waitForSelector('.song', {timeout: 20000});
+  await phone.click('.song');
+  await phone.click('#toStep2');
+  await phone.waitForSelector('#view2.on');
+  await phone.$eval('#visitor', (e) => { e.value = ''; }); // o nome fica salvo no localStorage
+  await phone.type('#visitor', 'Joana');
+  await Promise.all([phone.waitForSelector('#view3.on', {timeout: 25000}), phone.click('#pay')]);
+  await new Promise((r) => setTimeout(r, 1200));
+  assert.ok(segundo?.requestId, 'o segundo pedido precisa chegar ao backend');
+  await (await fetch(BASE + '/api/commerce/mock-confirm', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({requestId: segundo.requestId}),
+  })).json();
+
+  // O cliente tem de ver a confirmacao no proprio celular.
+  await phone.waitForFunction(() => /confirmado/i.test(document.getElementById('status')?.textContent || ''), {timeout: 20000});
+  log('cliente_confirmado', {texto: await phone.$eval('#status', (e) => e.textContent.trim())});
+
+  await owner.bringToFront();
+  await owner.waitForFunction(() => document.getElementById('stageFlash')?.classList.contains('on'), {timeout: 20000});
+  const aviso = await owner.evaluate(() => ({
+    musica: document.getElementById('flashSong').textContent,
+    quem: document.getElementById('flashWho').textContent,
+    contador: document.getElementById('stageChip').textContent,
+  }));
+  assert.ok(aviso.quem.includes('Joana'), `o aviso precisa dizer quem pediu, veio "${aviso.quem}"`);
+  assert.ok(aviso.musica.length > 0, 'o aviso precisa dizer qual musica entrou');
+  log('aviso_no_palco', aviso);
+
+  // ---------- a lista de pedidos pagos se atualiza sozinha, sem recarregar ----------
+  const naLista = await owner.$eval('#paidList', (e) => e.textContent);
+  assert.ok(naLista.includes('Joana'), `o pedido novo precisa aparecer na lista sem recarregar, lista: ${naLista.slice(0, 200)}`);
+  log('pedido_na_lista', {trecho: naLista.replace(/\s+/g, ' ').slice(0, 90)});
+
+  // ---------- os controles do palco ----------
+  // O navegador headless nao consegue tocar video do YouTube de verdade (a reproducao
+  // morre em ~2s), entao o laco completo de pular vive no test-php-e2e. Aqui provamos
+  // o que so o navegador prova: o botao nao recarrega a pagina e o comando chega ao
+  // painel que esta rodando.
+  const comandosRecebidos = [];
+  owner.on('response', async (r) => {
+    if (r.url().includes('/api/device/state')) { try { const j = await r.json(); if (j.command) comandosRecebidos.push(j.command); } catch {} }
+  });
+  await owner.evaluate(() => { window.__mesmaPagina = true; });
+
+  await comando(owner, 'PAUSE');
+  await owner.waitForFunction(() => window.__mesmaPagina === true, {timeout: 5000})
+    .catch(() => { throw new Error('o botao Pausar recarregou a pagina — isso mataria a musica'); });
+  await comando(owner, 'SKIP');
+  await new Promise((r) => setTimeout(r, 9000));
+  assert.ok(await owner.evaluate(() => window.__mesmaPagina === true), 'os controles nao podem recarregar a pagina do painel');
+  assert.ok(comandosRecebidos.includes('PAUSE'), `o Pausar precisa chegar ao painel, chegaram: ${JSON.stringify(comandosRecebidos)}`);
+  assert.ok(comandosRecebidos.includes('SKIP'), `o Pular precisa chegar ao painel, chegaram: ${JSON.stringify(comandosRecebidos)}`);
+  log('controles', {comandos: comandosRecebidos});
+
   assert.deepEqual(problems, [], 'pages must load with no console/network errors');
   console.log(JSON.stringify({ok: true, venueCode, problems}, null, 2));
 } catch (e) {

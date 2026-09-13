@@ -77,7 +77,7 @@
     }
 
     function startPlayback(videoId, requestId) {
-      pendingRequestId = requestId; currentlyPlaying = true;
+      pendingRequestId = requestId; currentlyPlaying = true; pausedByOwner = false;
       mount.classList.add('on');
       const begin = () => {
         mount.innerHTML = '<div class="ytmount" style="width:100%;height:100%"></div>';
@@ -105,7 +105,7 @@
     function applyCommand(command) {
       if (!command) return;
       if (command === 'SKIP') { if (currentlyPlaying) finishPlayback('SKIPPED'); return; }
-      if (!ytPlayer) return;
+      if (!ytPlayer || !currentlyPlaying) return; // pausar uma tela parada nao quer dizer nada
       if (command === 'PAUSE') { pausedByOwner = true; clearWatchdog(); ytPlayer.pauseVideo(); }
       else if (command === 'PLAY') { pausedByOwner = false; ytPlayer.playVideo(); }
     }
@@ -165,6 +165,7 @@
     return {
       begin() { started = true; },
       isPlaying() { return currentlyPlaying; },
+      isPausedByOwner() { return pausedByOwner; },
       run() { tick(); },
     };
   };
