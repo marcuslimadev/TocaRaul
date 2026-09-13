@@ -78,6 +78,14 @@ try {
   assert.match(legacy.headers.get('location') ?? '', /\/bar/, '/tv should point at the panel');
   log('legacy_redirect', {status: legacy.status, to: legacy.headers.get('location')});
 
+  // ---------- um login do Google expirado precisa ter caminho de volta ----------
+  const expired = await fetch(`${BASE}/api/oauth/google/callback?state=expirado&code=qualquer`);
+  const expiredHtml = await expired.text();
+  assert.ok(expiredHtml.includes('/auth/google/start'), 'a pagina de estado invalido deve oferecer tentar de novo');
+  assert.ok(expiredHtml.includes('href="/bar"'), 'a pagina de estado invalido deve oferecer o login por senha');
+  assert.ok(expiredHtml.includes('bauhaus.css'), 'a pagina de erro tambem e Bauhaus');
+  log('oauth_dead_end', {status: expired.status});
+
   // ---------- the heart of it: a paid order plays inside the panel ----------
   await phone.type("#search", "Tim Maia Voce");
   await phone.waitForSelector(".song", {timeout: 20000});

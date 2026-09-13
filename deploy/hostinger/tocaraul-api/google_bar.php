@@ -4,17 +4,39 @@ require_once __DIR__ . '/admin_settings.php';
 require_once __DIR__ . '/onboarding.php';
 
 // This flow is for bar/restaurant owners only. Admin and partner sessions are untouched.
-session_set_cookie_params(['lifetime'=>600,'path'=>'/','secure'=>!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off','httponly'=>true,'samesite'=>'Lax']);
+ini_set('session.use_strict_mode','1');
+// 10 minutos era pouco: quem para para escolher a conta no Google voltava sem estado.
+session_set_cookie_params(['lifetime'=>1800,'path'=>'/','secure'=>!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off','httponly'=>true,'samesite'=>'Lax']);
 open_session('tocaraul_google');
 
 function google_config(string $name): string { return defined($name) ? (string)constant($name) : (string)(getenv($name) ?: ''); }
 function google_redirect_uri(): string { return rtrim(google_config('PUBLIC_APP_URL'), '/') . '/api/oauth/google/callback'; }
 function google_b64url(string $value): string { return rtrim(strtr(base64_encode($value), '+/', '-_'), '='); }
+
+/**
+ * Nenhum erro deste fluxo pode virar uma pagina morta: o dono precisa de um
+ * caminho de volta. Voltar pelo botao do navegador, recarregar a pagina de
+ * retorno ou demorar para escolher a conta caem todos aqui.
+ */
+function oauth_stop(int $status, string $title, string $body, bool $retry): never {
+    http_response_code($status);
+    header('Content-Type: text/html; charset=utf-8');
+    $h = fn(string $t): string => htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
+    echo '<!doctype html><html lang=pt-BR><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">'
+       . '<title>' . $h($title) . ' · TocaRaul</title><link rel=stylesheet href="/assets/bauhaus.css"></head>'
+       . '<body class=bh-panel><div class=w><div class=logo><i></i><b>TocaRaul</b></div>'
+       . '<div class="c accent"><h2>' . $h($title) . '</h2><p>' . $body . '</p><p class=row>'
+       . ($retry ? '<a class=bauhaus-btn href="/auth/google/start">Tentar de novo com Google</a>' : '')
+       . '<a class="bauhaus-btn alt" href="/bar">Entrar com código e senha</a>'
+       . '</p></div></div></body></html>';
+    exit;
+}
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 
 if (in_array($path, ['/auth/google/start','/api/oauth/google/start'], true)) {
     $client = google_config('GOOGLE_CLIENT_ID');
-    if ($client === '') { http_response_code(503); exit('Google nao configurado.'); }
+    if ($client === '') oauth_stop(503, 'Login com Google indisponível',
+        'O login com Google ainda não está configurado neste servidor. Use o código do bar e a senha por enquanto.', false);
     $state = bin2hex(random_bytes(32));
     $verifier = google_b64url(random_bytes(32));
     $_SESSION['google_state'] = $state;
@@ -30,7 +52,11 @@ if (in_array($path, ['/auth/google/callback','/api/oauth/google/callback'], true
     $state = (string)($_GET['state'] ?? '');
     $code = (string)($_GET['code'] ?? '');
     if ($state === '' || !hash_equals((string)($_SESSION['google_state'] ?? ''), $state) || $code === '') {
-        http_response_code(403); exit('Estado OAuth invalido.');
+        // Chegar aqui nao e ataque na maioria das vezes: e o botao Voltar, um F5 nesta
+        // pagina ou meia hora parado na tela do Google. O estado so vale uma vez.
+        oauth_stop(403, 'A janela do login expirou',
+            'Esse retorno do Google já foi usado ou passou do tempo. Isso acontece ao voltar com o botão do navegador ou ao recarregar esta página. '
+          . 'Comece o login de novo — se repetir, confira se o navegador aceita cookies deste site.', true);
     }
     unset($_SESSION['google_state']);
     $client = google_config('GOOGLE_CLIENT_ID');
@@ -47,13 +73,20 @@ if (in_array($path, ['/auth/google/callback','/api/oauth/google/callback'], true
     $tokens = json_decode(is_string($raw) ? $raw : '{}', true);
     $idToken = (string)($tokens['id_token'] ?? '');
     if ($status < 200 || $status >= 300 || $idToken === '') {
-        error_log('[TocaRaul OAuth] token exchange failed status='.$status.' error='.((string)($tokens['error'] ?? 'unknown')).' curl='.($curlError !== '' ? 'yes' : 'no'));
-        http_response_code(401); exit('Falha ao autenticar com Google.');
+        $reason = (string)($tokens['error'] ?? 'unknown');
+        error_log('[TocaRaul OAuth] token exchange failed status='.$status.' error='.$reason.' curl='.($curlError !== '' ? 'yes' : 'no'));
+        $credentials = in_array($reason, ['invalid_client','unauthorized_client'], true);
+        oauth_stop(401, 'Não consegui concluir o login',
+            $credentials
+              ? 'As credenciais do Google configuradas neste servidor não foram aceitas. Isso é com a gente, não com a sua conta — entre com o código do bar e a senha enquanto resolvemos.'
+              : 'O Google recusou esta tentativa. Tente de novo; se continuar, entre com o código do bar e a senha.',
+            !$credentials);
     }
     $info = json_decode((string)file_get_contents('https://oauth2.googleapis.com/tokeninfo?id_token=' . rawurlencode($idToken)), true);
     $email = strtolower(trim((string)($info['email'] ?? '')));
     if ((string)($info['aud'] ?? '') !== $client || !filter_var($info['email_verified'] ?? false, FILTER_VALIDATE_BOOLEAN) || $email === '') {
-        http_response_code(403); exit('Conta Google invalida.');
+        oauth_stop(403, 'Conta Google não confirmada',
+            'Essa conta não tem e-mail verificado no Google. Escolha outra conta ou entre com o código do bar e a senha.', true);
     }
     $query = settings_db()->prepare('SELECT v.id FROM venues v JOIN users u ON u.id=v.ownerId WHERE LOWER(u.email)=? LIMIT 1');
     $query->execute([$email]); $venue = $query->fetch();
@@ -77,3 +110,4 @@ if (in_array($path, ['/auth/google/callback','/api/oauth/google/callback'], true
     exit;
 }
 http_response_code(404); exit('Not found');
+
