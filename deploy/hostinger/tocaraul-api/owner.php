@@ -134,6 +134,13 @@ function paintQueue(state){
  const paid=queue.filter(i=>i.status==='QUEUED');
  chip.textContent=paid.length===1?'1 na fila':paid.length+' na fila';
 
+ // O painel pode abrir no meio de uma música. Nesse cenário o player ainda
+ // não conheceu o pedido localmente, mas a API já conhece o texto completo.
+ // Sincronizar aqui evita palco com vídeo tocando e dedicatória vazia.
+ const atual=state.nowPlaying;
+ const dedicacao=document.getElementById('pDedication');
+ if(dedicacao) dedicacao.textContent=atual?.message ? atual.message+(atual.visitorName?' — '+atual.visitorName:'') : '';
+
  // Na primeira leitura so registramos o que ja estava la: avisar tudo de uma vez nao ajuda ninguem.
  const ids=new Set(queue.map(i=>i.id));
  if(known===null){known=ids;renderPaid(queue);return}
@@ -145,7 +152,7 @@ function paintQueue(state){
 
 function announce(pedido){
  flashSong.textContent=pedido.title+(pedido.artist?' · '+pedido.artist:'');
- flashWho.textContent=pedido.visitorName?'Pedido de '+pedido.visitorName:'';
+ flashWho.textContent=(pedido.visitorName?'Pedido de '+pedido.visitorName:'')+(pedido.message?' · '+pedido.message:'');
  flash.classList.add('on');
  clearTimeout(flashTimer);
  flashTimer=setTimeout(()=>flash.classList.remove('on'),14000);

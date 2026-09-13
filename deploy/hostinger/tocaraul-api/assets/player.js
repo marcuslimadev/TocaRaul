@@ -113,10 +113,19 @@
     function paint(state) {
       set(ui.venue, state.venue?.name || 'TocaRaul');
       set(ui.queue, (state.queueSize || 0) + ' pedido(s) na fila');
-      if (!currentlyPlaying) {
-        set(ui.title, state.nowPlaying?.title || 'Aguardando pedidos');
-        set(ui.artist, state.nowPlaying?.artist || '');
-        set(ui.dedication, state.nowPlaying?.message || '');
+      // O painel pode ser recarregado enquanto uma música já está tocando.
+      // Nesse caso currentlyPlaying ainda é falso no navegador, embora a API
+      // já tenha um nowPlaying. Sempre sincronizamos os textos com o estado.
+      if (state.nowPlaying) {
+        set(ui.title, state.nowPlaying.title || '');
+        set(ui.artist, state.nowPlaying.artist || '');
+        set(ui.dedication, state.nowPlaying.message
+          ? state.nowPlaying.message + (state.nowPlaying.visitorName ? ' — ' + state.nowPlaying.visitorName : '')
+          : '');
+      } else if (!currentlyPlaying) {
+        set(ui.title, 'Aguardando pedidos');
+        set(ui.artist, '');
+        set(ui.dedication, '');
       }
       if (opts.onState) opts.onState(state);
     }
