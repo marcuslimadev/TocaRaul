@@ -31,7 +31,9 @@ if($method==='GET'&&$path==='/api/device/state'){
   db()->prepare("UPDATE devices SET status='ONLINE',lastSeenAt=NOW() WHERE id=?")->execute([(int)$device['id']]);
  }
  $venueKey='venue_'.$venueId;
- $state=state_cache_read($venueKey,20);
+ // O painel consulta a cada poucos segundos; manter o estado por 60s evita
+ // consumir a cota de conexões do MySQL sem deixar pedidos novos esperando.
+ $state=state_cache_read($venueKey,60);
  $command=null;
  if($state===null){
   // Uma unica ida ao banco resolve estado, heartbeat e comando pendente.
