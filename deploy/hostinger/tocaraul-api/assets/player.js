@@ -144,7 +144,13 @@
           }
           if (started && !pendingRequestId && !currentlyPlaying) {
             const claimed = await api('/api/player/claim', {}, deviceToken);
-            const track = claimed.track;
+            let track = claimed.track;
+            // Sem pedido pago e sem playlist, mantém o bar tocando com uma
+            // música já reproduzida anteriormente naquele próprio bar.
+            if (!track) {
+              const randomHistory = await api('/api/player/random', {}, deviceToken);
+              track = randomHistory.track;
+            }
             const videoId = track?.providerId?.replace('youtube:', '');
             if (track && videoId && /^[A-Za-z0-9_-]{11}$/.test(videoId)) {
               if (track.message && state.venue?.announceDedication !== false) {
