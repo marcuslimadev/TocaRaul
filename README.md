@@ -1,6 +1,6 @@
 # TocaRaul
 
-Jukebox digital para bares. O cliente escaneia o QR Code da mesa, escolhe a
+Jukebox web para bares e restaurantes. O cliente escaneia um QR Code único do
 música, paga por Pix e a música entra na fila que toca na tela do bar.
 
 ## Regra de negócio
@@ -27,7 +27,7 @@ música, paga por Pix e a música entra na fila que toca na tela do bar.
 2. Preenche bar, CPF/CNPJ e chave Pix em `/cadastro` — sem precisar de TV.
 3. Cai logado no painel `/bar`, que já traz o player do YouTube embutido.
 4. Envia a logo do bar e monta a playlist buscando músicas pelo nome.
-5. Imprime o QR Code de pedidos e cola nas mesas.
+5. Imprime ou compartilha o QR Code único do bar.
 6. O cliente pede e paga em `/j/<token>`; a fila toca sozinha na tela do bar.
 7. No painel o dono controla tocar/pausar/pular, bane palavras e músicas, e vê
    o saldo.
@@ -46,18 +46,23 @@ O palco em `/bar` é uma peça só, em 16:9, pronta para projetor ou TV:
 ```
 
 A logo fica sobreposta ao vídeo, a dedicatória do pedido que está tocando fica
-escrita na coluna da direita, e o QR Code de pedidos fica sempre à vista.
+escrita na coluna da direita, e o QR Code único do bar fica sempre à vista.
+
+Não há operação de várias telas nem gerenciamento de mesas. O próprio PC do bar
+mantém o `/bar` aberto como painel e player, com fila do YouTube, pedidos,
+dedicatórias e modo tela cheia.
 
 ## Stack
 
-**Só duas linguagens**: PHP no servidor e JavaScript no navegador. Sem build,
-sem framework, sem transpilação — o que está em `deploy/hostinger/tocaraul-api/`
-é exatamente o que roda em produção.
+**Só duas linguagens no produto**: PHP no servidor e JavaScript no navegador.
+O servidor de produção não tem Node.js; scripts Node são apenas ferramentas
+locais de teste/build. O que está em `deploy/hostinger/tocaraul-api/` é enviado
+como versão estática/PHP para o Hostinger.
 
 | Caminho | O que é |
 | --- | --- |
 | `deploy/hostinger/tocaraul-api/` | O produto inteiro (páginas + API em PHP) |
-| `deploy/hostinger/tocaraul-api/assets/` | JS e imagens servidos ao navegador |
+| `deploy/hostinger/tocaraul-api/assets/` | JS, CSS e imagens servidos ao navegador |
 | `scripts/` | Servidor local de teste e suítes automatizadas (Node, só ferramenta) |
 | `docs/` | Pesquisa de apoio |
 | `legacy/` | Versões abandonadas — ver abaixo |
@@ -69,11 +74,14 @@ sem framework, sem transpilação — o que está em `deploy/hostinger/tocaraul-
 | `/` | `home.php` | Visitante |
 | `/cadastro` | `signup.php` | Dono cadastrando o bar |
 | `/bar` | `owner.php` | Dono: painel com o player do YouTube embutido |
-| `/j/<token>` | `customer.php` | Cliente na mesa |
+| `/j/<token>` | `customer.php` | Cliente fazendo pedido do bar |
 | `/parceiro` | `partner.php` | Parceiro comercial que cadastra bares |
 | `/admin` | `admin.php` | Operação TocaRaul |
 | `/privacy` | `privacy.php` | Política de privacidade |
-| `/auth/google/*` | `google_bar.php` | Login do dono com Google |
+| `/api/oauth/google/*` | `google_bar.php` | Login Google dos bares |
+
+O visual interno usa Bauhaus discreto: fundo claro, tipografia legível, poucos
+acentos em amarelo/vermelho/azul e sem excesso de formas ou sombras.
 
 ### Como rodar local
 
@@ -87,6 +95,9 @@ npm run test:quality   # jornada completa: pedido pago toca no painel
 ```
 
 `.env.local` guarda as credenciais locais e nunca vai para o Git.
+
+O Asaas permanece em sandbox: nenhum teste ou pedido de homologação movimenta
+dinheiro real.
 
 ## legacy/
 
