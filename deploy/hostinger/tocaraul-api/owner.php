@@ -46,7 +46,7 @@ if($v&&d()->query("SHOW TABLES LIKE 'financeLedger'")->fetchColumn()){
  $q->execute([(int)$v['id']]);foreach($q->fetchAll() as $row){if($row['balanceStatus']==='AVAILABLE')$balance['available']=(int)$row['cents'];if($row['balanceStatus']==='PENDING')$balance['pending']=(int)$row['cents'];}
 }
 function money(int $c):string{return 'R$ '.number_format($c/100,2,',','.');}
-function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}?><!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>Painel do Bar · TocaRaul</title><link rel=stylesheet href="/assets/bauhaus.css"><body class=bh-panel><div class=w><div class=logo><i></i><b>TocaRaul · Painel do Bar</b></div><?php if($err):?><p class=err><?=h($err)?></p><?php endif;?><?php if(!$v):?><div class=c style="max-width:430px"><h2>Entrar</h2>
+function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}?><!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>Painel do Bar · TocaRaul</title><link rel=stylesheet href="/assets/bauhaus.css?v=20260912-2"><body class=bh-panel><div class=w><div class=logo><i></i><b>TocaRaul · Painel do Bar</b></div><?php if($err):?><p class=err><?=h($err)?></p><?php endif;?><?php if(!$v):?><div class=c style="max-width:430px"><h2>Entrar</h2>
 <?php if(google_ready()):?><a href="/auth/google/start" style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#171717;font-weight:900;text-transform:uppercase;padding:13px;border:3px solid #171717;box-shadow:4px 4px 0 #171717;text-decoration:none;margin-bottom:14px"><svg width=18 height=18 viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9.1h12.4c-.5 2.9-2.2 5.4-4.700 7l7.6 5.9c4.4-4.1 6.8-10.1 6.8-17.4z"/><path fill="#FBBC05" d="M10.4 28.7c-.5-1.4-.8-2.9-.8-4.7s.3-3.3.8-4.7l-7.8-6.1C.9 16.5 0 20.1 0 24s.9 7.5 2.6 10.8l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.8 2.3-8.3 2.3-6.3 0-11.7-3.7-13.6-9.8l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/></svg> Entrar com Google</a>
 <p class=muted style="text-align:center;margin:10px 0">ou</p><?php endif;?>
 <p class=muted>Use o código do bar e a senha definida no cadastro.</p><form method=post><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=login><label>Codigo do bar</label><input name=code required><label>Senha</label><input type=password name=password required><button>Entrar</button></form>
@@ -62,7 +62,7 @@ function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}?><!docty
 <?php if(!empty($v['logoPath'])):?> <div class=plate><img src="<?=h($v['logoPath'])?>" alt="<?=h($v['name'])?>"></div><?php endif;?>
  <div class=side>
   <div class=ded><em>Dedicatória</em><p id=pDedication></p></div>
-  <div class=qr><div id=stageQr></div><span>Peça sua música</span></div>
+  <div class=qr><div class=code id=stageQr></div><span>Peça sua música</span></div>
  </div>
  <div id=stageStart class=gate>
   <b>Ligar a tela do bar</b>
