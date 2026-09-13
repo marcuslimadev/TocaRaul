@@ -164,7 +164,15 @@
           }
         } else if (opts.onOffline) opts.onOffline(state);
       } catch (e) {
-        if (e.status === 401) { if (opts.onNeedsLogin) opts.onNeedsLogin(); return; }
+        if (e.status === 401) {
+          // O token da tela pode ser revogado/expirar sem que o bar precise
+          // voltar para a tela inicial. Remova-o e deixe o próximo ciclo criar
+          // outro automaticamente, preservando a sessão e a reprodução.
+          try { localStorage.removeItem(store); } catch (x) {}
+          deviceToken = null;
+          setTimeout(tick, 1000);
+          return;
+        }
         if (e.status === 410 || e.status === 404) { try { localStorage.removeItem(store); } catch (x) {} deviceToken = null; }
         if (opts.onOffline) opts.onOffline(null);
       }
