@@ -12,30 +12,10 @@
 
     let started = false, pendingRequestId = null, pendingResult = null, currentlyPlaying = false;
     let ytApiReady = false, ytPlayer = null, watchdog = null;
-    let voiceDone = true, pausedByOwner = false, ptVoice = null;
+    let pausedByOwner = false;
 
     window.onYouTubeIframeAPIReady = () => { ytApiReady = true; };
     (() => { const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); })();
-
-    function loadVoices() {
-      const v = speechSynthesis.getVoices();
-      ptVoice = v.find((x) => x.lang && x.lang.toLowerCase().startsWith('pt-br'))
-        || v.find((x) => x.lang && x.lang.toLowerCase().startsWith('pt')) || null;
-    }
-    if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
-
-    function speak(text) {
-      return new Promise((resolve) => {
-        if (!('speechSynthesis' in window)) return resolve();
-        try {
-          const u = new SpeechSynthesisUtterance(text);
-          u.lang = 'pt-BR'; u.rate = 0.9; u.pitch = 0.85; u.volume = 1;
-          if (ptVoice) u.voice = ptVoice;
-          u.onend = resolve; u.onerror = resolve;
-          speechSynthesis.speak(u);
-        } catch (e) { resolve(); }
-      });
-    }
 
     async function api(path, body, token) {
       const res = await fetch(path, {
@@ -67,15 +47,6 @@
       pendingResult = result;
     }
 
-    function rampVolumeUp() {
-      if (!ytPlayer) return;
-      let v = 18;
-      const iv = setInterval(() => {
-        v += 8; if (v >= 100) { v = 100; clearInterval(iv); }
-        try { ytPlayer.setVolume(v); } catch (e) { clearInterval(iv); }
-      }, 120);
-    }
-
     function startPlayback(videoId, requestId) {
       pendingRequestId = requestId; currentlyPlaying = true; pausedByOwner = false;
       mount.classList.add('on');
@@ -90,7 +61,7 @@
           // tela cheia. fs/modestbranding ficam de reforço, redundantes mas inofensivos.
           playerVars: { autoplay: 1, controls: 0, disablekb: 1, rel: 0, playsinline: 1, fs: 0, modestbranding: 1, iv_load_policy: 3 },
           events: {
-            onReady: (e) => { e.target.setVolume(voiceDone ? 100 : 18); e.target.playVideo(); armWatchdog(); },
+            onReady: (e) => { e.target.setVolume(100); e.target.playVideo(); armWatchdog(); },
             onStateChange: (e) => {
               if (e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.BUFFERING) clearWatchdog();
               else if (!pausedByOwner) armWatchdog();
@@ -164,12 +135,6 @@
             }
             const videoId = track?.providerId?.replace('youtube:', '');
             if (track && videoId && /^[A-Za-z0-9_-]{11}$/.test(videoId)) {
-              if (track.message && state.venue?.announceDedication !== false) {
-                voiceDone = false;
-                const who = track.visitorName && track.visitorName !== 'Cliente' ? track.visitorName : 'um cliente';
-                speak('Uma dedicatória de ' + who + '. ' + track.message + '. E agora, para você: ' + track.title + '.')
-                  .then(() => { voiceDone = true; rampVolumeUp(); });
-              } else voiceDone = true;
               // paint() leaves the texts alone while a song runs, so write this one's now.
               set(ui.title, track.title || '');
               set(ui.artist, track.artist || '');

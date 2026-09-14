@@ -11,7 +11,7 @@ if(!empty($_SESSION['venue'])){
 }
 $qrUrl=($v&&$tables)?runtime_public_url().'/j/'.$tables[0]['qrToken']:'';
 ?><!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>TocaRaul · Tela da TV</title>
-<link rel=stylesheet href="/assets/bauhaus.css?v=20260914-2"><link rel=stylesheet href="/assets/tv.css?v=20260914-2">
+<link rel=stylesheet href="/assets/bauhaus.css?v=20260914-2"><link rel=stylesheet href="/assets/tv.css?v=20260914-3">
 <body class=tv-app>
 <?php if(!$v):?>
 <div class="tv-gate bh-panel">
@@ -52,9 +52,9 @@ $qrUrl=($v&&$tables)?runtime_public_url().'/j/'.$tables[0]['qrToken']:'';
   <div class=tv-reconnect id=reconnect>Reconectando…</div>
  </div>
  <div class=tv-side>
-  <div class=tv-dedication id=dedicationPanel>
-   <span class=tv-eyebrow>Dedicatória</span>
-   <p id=dedMessage></p>
+  <div class="tv-dedication empty" id=dedicationPanel>
+   <span class=tv-eyebrow id=dedEyebrow></span>
+   <p id=dedMessage>Leia o QR code e escolha a música para tocar aqui...</p>
   </div>
   <div class=tv-qr>
    <span class=tv-eyebrow>Escolha a próxima música</span>
@@ -65,28 +65,34 @@ $qrUrl=($v&&$tables)?runtime_public_url().'/j/'.$tables[0]['qrToken']:'';
 </div>
 <button type=button id=fsBtn class=tv-fs-btn>⛶ Entrar em tela cheia</button>
 <script src="/assets/qrcode.js"></script>
-<script src="/assets/player.js?v=20260914-3"></script>
+<script src="/assets/player.js?v=20260914-4"></script>
 <script>
 const qrUrl=<?=json_encode($qrUrl,JSON_UNESCAPED_SLASHES)?>;
 if(qrUrl)new QRCode(document.getElementById('stageQr'),{text:qrUrl,width:320,height:320});
 
 const mount=document.getElementById('ytmount'),idle=document.getElementById('idleState');
 const nowOverlay=document.getElementById('nowPlayingOverlay');
-const dedPanel=document.getElementById('dedicationPanel'),dedMessage=document.getElementById('dedMessage');
+const dedPanel=document.getElementById('dedicationPanel'),dedEyebrow=document.getElementById('dedEyebrow'),dedMessage=document.getElementById('dedMessage');
 const toast=document.getElementById('toast'),toastTitle=document.getElementById('toastTitle'),toastWho=document.getElementById('toastWho');
 const gate=document.getElementById('gate'),reconnect=document.getElementById('reconnect');
+const CONVITE='Leia o QR code e escolha a música para tocar aqui...';
 
 let lastDedication='',known=null,toastTimer=0;
 
+// A lateral e sempre dona do bloco de cima: com pedido pago, mostra a
+// dedicatoria; sem pedido pago, convida a pedir. Nunca fica em branco.
 function paintQueue(state){
- // Dedicatoria: fade/slide leve ao trocar de texto, sem balanco continuo.
- const texto=state.nowPlaying?.message||'';
- dedPanel.style.display=texto?'flex':'none';
- if(texto&&texto!==lastDedication){
+ const atual=state.nowPlaying;
+ const texto=atual?.message||'';
+ const conteudo=texto?(texto+(atual.visitorName?' — '+atual.visitorName:'')):CONVITE;
+ dedPanel.classList.toggle('empty',!texto);
+ dedEyebrow.textContent=texto?'Dedicatória':'';
+ dedMessage.textContent=conteudo;
+ if(conteudo!==lastDedication){
   dedPanel.classList.remove('show');
   requestAnimationFrame(()=>requestAnimationFrame(()=>dedPanel.classList.add('show')));
  }
- lastDedication=texto;
+ lastDedication=conteudo;
 
  // Pedido novo: aviso temporario que nao bloqueia o video.
  const queue=state.queue||[];
@@ -107,7 +113,7 @@ function announce(pedido){
 
 const screen=TocaRaulPlayer({
  venueId:<?=(int)$v['id']?>,mount,screenName:'Tela da TV',
- ui:{title:'npTitle',artist:'npArtist',dedication:'dedMessage'},
+ ui:{title:'npTitle',artist:'npArtist'},
  onOnline:()=>reconnect.classList.remove('on'),
  onOffline:()=>reconnect.classList.add('on'),
  onState:paintQueue,
