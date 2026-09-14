@@ -11,7 +11,7 @@ if(!empty($_SESSION['venue'])){
 }
 $qrUrl=($v&&$tables)?runtime_public_url().'/j/'.$tables[0]['qrToken']:'';
 ?><!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><title>TocaRaul · Tela da TV</title>
-<link rel=stylesheet href="/assets/bauhaus.css?v=20260914-1"><link rel=stylesheet href="/assets/tv.css?v=20260914-1">
+<link rel=stylesheet href="/assets/bauhaus.css?v=20260914-2"><link rel=stylesheet href="/assets/tv.css?v=20260914-2">
 <body class=tv-app>
 <?php if(!$v):?>
 <div class="tv-gate bh-panel">
@@ -65,7 +65,7 @@ $qrUrl=($v&&$tables)?runtime_public_url().'/j/'.$tables[0]['qrToken']:'';
 </div>
 <button type=button id=fsBtn class=tv-fs-btn>⛶ Entrar em tela cheia</button>
 <script src="/assets/qrcode.js"></script>
-<script src="/assets/player.js?v=20260914-1"></script>
+<script src="/assets/player.js?v=20260914-2"></script>
 <script>
 const qrUrl=<?=json_encode($qrUrl,JSON_UNESCAPED_SLASHES)?>;
 if(qrUrl)new QRCode(document.getElementById('stageQr'),{text:qrUrl,width:320,height:320});
