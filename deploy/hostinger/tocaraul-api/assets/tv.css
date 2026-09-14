@@ -1,0 +1,79 @@
+/* ---- /tv: jukebox fullscreen, nao uma pagina web tradicional ----
+   Sem max-width, sem container centralizado, sem scroll. A tela inteira
+   (html/body/.tv-app) e ocupada; a TV so deve mostrar player + lateral. */
+:root{--tv-safe:clamp(16px,1.2vw,32px)}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--ink)}
+body.tv-app{font-family:Arial,sans-serif;color:var(--paper);cursor:default}
+body.tv-app.cursor-hide{cursor:none}
+.tv-stage{width:100vw;height:100vh;display:grid;grid-template-columns:minmax(0,1fr) clamp(280px,20vw,400px);background:var(--ink)}
+
+/* Area central: o player domina, sem bordas nem espacos. */
+.tv-player{position:relative;min-width:0;min-height:0;background:#000;overflow:hidden}
+.tv-player .tv-mount,.tv-player .tv-mount iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none}
+.tv-player .tv-mount.on,.tv-player .tv-mount.on iframe{display:block}
+
+/* Estado de repouso: nunca tela preta vazia. */
+.tv-idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:6%;
+ background:radial-gradient(circle at 30% 20%,#1c1c1c 0%,#000 70%)}
+.tv-idle.hidden{display:none}
+.tv-idle img{max-height:14vh;max-width:40%;object-fit:contain;margin-bottom:8px}
+.tv-idle h1{margin:0;font:900 clamp(28px,4.4vw,64px)/1.05 Arial;text-transform:uppercase;letter-spacing:-.03em;color:var(--paper)}
+.tv-idle p{margin:0;font:700 clamp(14px,1.6vw,22px) Arial;color:var(--yellow);text-transform:uppercase;letter-spacing:.04em}
+@keyframes tv-idle-glow{0%,100%{opacity:.55}50%{opacity:1}}
+.tv-idle:before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 70% 75%,rgba(244,196,48,.12),transparent 60%);animation:tv-idle-glow 6s ease-in-out infinite;pointer-events:none}
+
+/* Zona segura: nada essencial encostado na borda (overscan de TVs antigas). */
+.tv-safe{position:absolute;z-index:3}
+.tv-brandcorner{top:var(--tv-safe);left:var(--tv-safe);max-width:220px;max-height:80px;background:rgba(23,23,23,.62);border-radius:8px;padding:8px 12px;display:flex;align-items:center}
+.tv-brandcorner img{display:block;max-width:100%;max-height:64px;object-fit:contain}
+.tv-brandcorner.powered{font:700 12px monospace;letter-spacing:.08em;text-transform:uppercase;color:#cdc7bb;background:transparent;padding:4px}
+
+/* "Tocando agora": overlay discreto, nao um card grande. */
+.tv-nowplaying{left:var(--tv-safe);bottom:var(--tv-safe);max-width:60%;padding:2.4% 3% 1.6%;
+ background:linear-gradient(0deg,rgba(0,0,0,.82) 0%,rgba(0,0,0,0) 100%);border-radius:6px}
+.tv-nowplaying.hidden{display:none}
+.tv-eyebrow{display:block;font:700 clamp(9px,.85vw,13px) monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--yellow);margin-bottom:.4em}
+.tv-nowplaying b{display:block;font:900 clamp(16px,2.1vw,34px)/1.15 Arial;letter-spacing:-.02em}
+.tv-nowplaying span{display:block;font:700 clamp(11px,1.1vw,17px) Arial;color:#cdc7bb;margin-top:.2em}
+
+/* Notificacao temporaria de pedido novo: some sozinha, nao bloqueia o video. */
+.tv-toast{right:var(--tv-safe);top:var(--tv-safe);max-width:44%;background:var(--red);color:#fff;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);
+ padding:1.6% 2%;transform:translateY(-140%);opacity:0;transition:transform .3s ease-out,opacity .3s ease-out}
+.tv-toast.on{transform:translateY(0);opacity:1}
+.tv-toast b{display:block;font:900 clamp(13px,1.5vw,24px)/1.2 Arial;text-transform:uppercase;letter-spacing:-.02em;margin-top:.3em}
+.tv-toast span{display:block;font:700 clamp(10px,1vw,15px) Arial;margin-top:.2em}
+
+/* Gate inicial: autoplay com som exige um clique do operador. */
+.tv-gate{position:absolute;inset:0;z-index:5;background:rgba(10,10,10,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:6%}
+.tv-gate.hidden{display:none}
+.tv-gate h1{margin:0;font:900 clamp(30px,5vw,72px)/1 Arial;letter-spacing:-.04em;text-transform:uppercase;color:var(--yellow)}
+.tv-gate p{margin:0;max-width:520px;font-size:clamp(14px,1.3vw,19px);color:#cdc7bb}
+.tv-gate button{margin-top:10px;padding:18px 34px;border:0;border-radius:10px;background:var(--yellow);color:var(--ink);font:900 clamp(16px,1.6vw,22px) Arial;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
+.tv-gate button:active{transform:translateY(1px)}
+.tv-gate .bh-login{max-width:380px;margin:0;text-align:left}
+
+/* Reconexao: aviso discreto, nunca a tela inteira. */
+.tv-reconnect{position:absolute;top:var(--tv-safe);left:50%;transform:translateX(-50%) translateY(-140%);z-index:6;
+ background:rgba(23,23,23,.9);color:var(--paper);padding:8px 16px;border-radius:999px;font:700 13px Arial;transition:transform .25s ease-out}
+.tv-reconnect.on{transform:translateX(-50%) translateY(0)}
+
+/* Botao "Entrar em tela cheia": some quando o navegador ja esta em fullscreen. */
+.tv-fs-btn{position:fixed;right:var(--tv-safe);bottom:var(--tv-safe);z-index:7;background:rgba(23,23,23,.7);color:var(--paper);
+ border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:9px 13px;font-size:15px;cursor:pointer}
+:fullscreen .tv-fs-btn{opacity:0;pointer-events:none}
+
+/* Lateral: dedicatoria em cima, QR embaixo. Sem dedicatoria, o QR cresce. */
+.tv-side{display:flex;flex-direction:column;min-width:0}
+.tv-dedication{flex:0 0 auto;max-height:62%;overflow:hidden;background:var(--yellow);color:var(--ink);display:flex;flex-direction:column;
+ align-items:center;justify-content:center;text-align:center;padding:7% 6%;opacity:0;transform:translateY(-8px);transition:opacity .3s ease,transform .3s ease}
+.tv-dedication.show{opacity:1;transform:translateY(0)}
+.tv-dedication .tv-eyebrow{color:var(--ink);opacity:.65}
+.tv-dedication p{margin:0;font:900 clamp(15px,2vw,30px)/1.2 Arial;overflow-wrap:anywhere}
+.tv-dedication small{display:block;margin-top:10px;font:700 clamp(11px,1.1vw,16px) Arial;opacity:.75}
+.tv-qr{flex:1;min-height:0;background:#fff;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3%;padding:6%}
+.tv-qr .tv-eyebrow{color:#8a8578}
+.tv-qr .code{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;width:100%}
+.tv-qr .code canvas,.tv-qr .code img{width:min(320px,78%)!important;height:auto!important;max-width:100%;display:block}
+.tv-qr>span{font:700 clamp(11px,1.1vw,16px) Arial;color:#5f5a52;text-align:center}
+
+@media(prefers-reduced-motion:reduce){.tv-idle:before{animation:none}}

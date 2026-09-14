@@ -19,5 +19,6 @@ echo json_encode([
  ],
  'shortcuts'=>[
   ['name'=>'Painel do bar','url'=>'/bar'],
+  ['name'=>'Tela da TV','url'=>'/tv'],
  ],
 ],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);

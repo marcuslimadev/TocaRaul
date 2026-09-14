@@ -77,11 +77,15 @@ try {
   assert.ok(!overflow.docWider, `customer page overflows on a phone: ${JSON.stringify(overflow)}`);
   log('phone_layout', overflow);
 
-  // ---------- the old page must not be a dead end ----------
-  const legacy = await fetch(BASE + '/tv', {redirect: 'manual'});
-  assert.ok([301, 302].includes(legacy.status), '/tv should redirect');
-  assert.match(legacy.headers.get('location') ?? '', /\/bar/, '/tv should point at the panel');
-  log('legacy_redirect', {status: legacy.status, to: legacy.headers.get('location')});
+  // ---------- /tv is a real page now, not a dead-end redirect ----------
+  const tvAnon = await fetch(BASE + '/tv', {redirect: 'manual'});
+  assert.equal(tvAnon.status, 200, '/tv must render (login gate) even signed out');
+  const tvAnonHtml = await tvAnon.text();
+  assert.ok(tvAnonHtml.includes('name=code'), '/tv without a session must offer the bar login');
+  const playerAlias = await fetch(BASE + '/player', {redirect: 'manual'});
+  assert.ok([301, 302].includes(playerAlias.status), '/player should redirect to /tv');
+  assert.match(playerAlias.headers.get('location') ?? '', /\/tv/, '/player should point at the TV screen');
+  log('tv_route', {status: tvAnon.status, playerRedirect: playerAlias.status});
 
   // ---------- um login do Google expirado precisa ter caminho de volta ----------
   const expired = await fetch(`${BASE}/api/oauth/google/callback?state=expirado&code=qualquer`);
@@ -112,7 +116,7 @@ try {
     method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({requestId: order.requestId}),
   })).json();
   assert.ok(paid.ok, "sandbox payment must confirm");
-  // ---- the owner uploads the bar logo before turning the screen on ----
+  // ---- the owner uploads the bar logo, then opens the TV screen (a separate page/tab) ----
   await owner.bringToFront();
   await owner.reload({waitUntil: "networkidle0"});
   const logoFile = 'tmp/logo-quality.png';
@@ -123,31 +127,37 @@ try {
   assert.ok(logoInput, 'the panel must offer a logo upload');
   await logoInput.uploadFile(path.resolve(logoFile));
   await submit(owner, 'logo');
-  const logoSrc = await owner.$eval('#stage .plate img[src^="/assets/logos/"]', (e) => e.getAttribute('src'));
-  assert.ok(logoSrc, 'the bar logo must show on the stage');
-  log('logo_on_stage', {logoSrc});
+  const logoSrc = await owner.$eval('img[src^="/assets/logos/"]', (e) => e.getAttribute('src'));
+  assert.ok(logoSrc, 'the panel must show the uploaded logo');
+  log('logo_uploaded', {logoSrc});
 
-  // ---- the stage carries the written dedication and the order QR next to the player ----
-  const sideQr = await owner.$$eval('#stage .side .qr canvas, #stage .side .qr img', (els) => els.length);
-  assert.ok(sideQr >= 1, 'the stage must show the order QR code beside the player');
-  await owner.click("#stageBtn");
-  await owner.waitForFunction(() => document.getElementById("ytmount")?.classList.contains("on"), {timeout: 30000});
-  const playing = await owner.evaluate(() => document.querySelector("#ytmount iframe")?.src ?? null);
-  assert.ok((playing ?? '').includes('youtube.com/embed/'), 'the panel must play the paid song on YouTube');
-  const shown = await owner.$eval('#pDedication', (e) => e.textContent.trim());
-  if (messageField) assert.ok(shown.includes(dedication), `the stage must keep the dedication on screen, got "${shown}"`);
-  log("panel_playing", {iframe: playing?.slice(0, 60), dedication: shown});
+  // ---- /tv is its own tab; it shares the bar's login session (same browser context) ----
+  const tv = await browser.newPage();
+  watch(tv, 'tv');
+  await tv.goto(BASE + '/tv', {waitUntil: 'networkidle0'});
+  const tvLogoSrc = await tv.$eval('.tv-brandcorner img', (e) => e.getAttribute('src'));
+  assert.ok((tvLogoSrc ?? '').startsWith('/assets/logos/'), 'the bar logo must show on the TV screen');
+  const sideQr = await tv.$$eval('.tv-qr canvas, .tv-qr img', (els) => els.length);
+  assert.ok(sideQr >= 1, 'the TV screen must show the order QR code beside the player');
+  await tv.click('#startBtn');
+  await tv.waitForFunction(() => document.getElementById('ytmount')?.classList.contains('on'), {timeout: 30000});
+  const playing = await tv.evaluate(() => document.querySelector('#ytmount iframe')?.src ?? null);
+  assert.ok((playing ?? '').includes('youtube.com/embed/'), 'the TV screen must play the paid song on YouTube');
+  const shown = await tv.$eval('#dedMessage', (e) => e.textContent.trim());
+  if (messageField) assert.ok(shown.includes(dedication), `the TV screen must keep the dedication on screen, got "${shown}"`);
+  log("tv_playing", {iframe: playing?.slice(0, 60), dedication: shown});
 
-  // ---------- quem pagou precisa ver que algo aconteceu, inclusive em tela cheia ----------
-  // Tudo o que avisa mora dentro de #stage; se estiver fora, a tela cheia engole.
-  const dentroDoPalco = await owner.evaluate(() => {
-    const stage = document.getElementById('stage');
-    return {
-      aviso: stage.contains(document.getElementById('stageFlash')),
-      contador: stage.contains(document.getElementById('stageChip')),
-    };
-  });
-  assert.ok(dentroDoPalco.aviso && dentroDoPalco.contador, `aviso e contador precisam viver dentro do palco: ${JSON.stringify(dentroDoPalco)}`);
+  // ---- the panel itself must never run the player (two claims would race) ----
+  const ownerHasNoPlayer = await owner.evaluate(() => !document.getElementById('ytmount') && !document.getElementById('stage'));
+  assert.ok(ownerHasNoPlayer, 'the panel must not embed the YouTube player anymore — only /tv does');
+  await owner.waitForFunction(
+    () => (document.getElementById('nowTitle')?.textContent || '').trim().length > 0
+      && document.getElementById('nowTitle').textContent !== 'Nenhuma música tocando',
+    {timeout: 15000},
+  );
+  const tvStatus = await owner.$eval('#tvStatusText', (e) => e.textContent);
+  assert.match(tvStatus, /online/i, `the panel must show the TV as online once /tv is polling, got "${tvStatus}"`);
+  log('panel_reads_status', {tvStatus, nowTitle: await owner.$eval('#nowTitle', (e) => e.textContent)});
 
   // Um segundo pedido pago, agora com o painel ja aberto: o aviso tem de acender sozinho.
   let segundo = null;
@@ -175,29 +185,33 @@ try {
   await phone.waitForFunction(() => /confirmado/i.test(document.getElementById('status')?.textContent || ''), {timeout: 20000});
   log('cliente_confirmado', {texto: await phone.$eval('#status', (e) => e.textContent.trim())});
 
-  await owner.bringToFront();
-  await owner.waitForFunction(() => document.getElementById('stageFlash')?.classList.contains('on'), {timeout: 20000});
-  const aviso = await owner.evaluate(() => ({
-    musica: document.getElementById('flashSong').textContent,
-    quem: document.getElementById('flashWho').textContent,
-    contador: document.getElementById('stageChip').textContent,
+  await tv.bringToFront();
+  await tv.waitForFunction(() => document.getElementById('toast')?.classList.contains('on'), {timeout: 20000});
+  const aviso = await tv.evaluate(() => ({
+    musica: document.getElementById('toastTitle').textContent,
+    quem: document.getElementById('toastWho').textContent,
   }));
   assert.ok(aviso.quem.includes('Joana'), `o aviso precisa dizer quem pediu, veio "${aviso.quem}"`);
   assert.ok(aviso.musica.length > 0, 'o aviso precisa dizer qual musica entrou');
-  log('aviso_no_palco', aviso);
+  log('aviso_na_tv', aviso);
 
-  // ---------- a lista de pedidos pagos se atualiza sozinha, sem recarregar ----------
+  // ---------- a fila do painel se atualiza sozinha, sem recarregar (poll de /bar?a=status) ----------
+  await owner.bringToFront();
+  await owner.waitForFunction(
+    () => (document.getElementById('paidList')?.textContent || '').includes('Joana'),
+    {timeout: 15000},
+  );
   const naLista = await owner.$eval('#paidList', (e) => e.textContent);
   assert.ok(naLista.includes('Joana'), `o pedido novo precisa aparecer na lista sem recarregar, lista: ${naLista.slice(0, 200)}`);
   log('pedido_na_lista', {trecho: naLista.replace(/\s+/g, ' ').slice(0, 90)});
 
-  // ---------- os controles do palco ----------
+  // ---------- os controles do painel chegam na TV ----------
   // O navegador headless nao consegue tocar video do YouTube de verdade (a reproducao
   // morre em ~2s), entao o laco completo de pular vive no test-php-e2e. Aqui provamos
-  // o que so o navegador prova: o botao nao recarrega a pagina e o comando chega ao
-  // painel que esta rodando.
+  // o que so o navegador prova: o botao do painel nao recarrega a pagina, e o comando
+  // chega na tela que de fato esta rodando o player (/tv, nao mais /bar).
   const comandosRecebidos = [];
-  owner.on('response', async (r) => {
+  tv.on('response', async (r) => {
     if (r.url().includes('/api/device/state')) { try { const j = await r.json(); if (j.command) comandosRecebidos.push(j.command); } catch {} }
   });
   await owner.evaluate(() => { window.__mesmaPagina = true; });

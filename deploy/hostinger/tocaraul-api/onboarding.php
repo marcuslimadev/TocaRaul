@@ -43,8 +43,37 @@ function venue_login(string $code,string $password):?array{
 }
 
 /**
+ * Creates the tables/columns shared by the admin panel (/bar) and the TV
+ * display (/tv). Both pages call this on every request, so it must stay a
+ * cheap no-op once the schema already exists.
+ */
+function ensure_bar_schema():void{
+ $d=settings_db();
+ $d->exec("CREATE TABLE IF NOT EXISTS barPlaylist(id int AUTO_INCREMENT PRIMARY KEY,venueId int NOT NULL,providerId varchar(255) NOT NULL,title varchar(255) NOT NULL,artist varchar(255) NOT NULL,position int NOT NULL DEFAULT 0,status varchar(20) NOT NULL DEFAULT 'QUEUED',createdAt timestamp DEFAULT CURRENT_TIMESTAMP,INDEX(venueId,status,position)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+ $d->exec("CREATE TABLE IF NOT EXISTS tvCommands(id int AUTO_INCREMENT PRIMARY KEY,venueId int NOT NULL,command varchar(20) NOT NULL,status varchar(20) NOT NULL DEFAULT 'PENDING',createdAt timestamp DEFAULT CURRENT_TIMESTAMP,executedAt timestamp NULL,INDEX(venueId,status,id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+ $existing=array_column($d->query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='venues'")->fetchAll(),'COLUMN_NAME');
+ if(!in_array('announceDedication',$existing,true))$d->exec("ALTER TABLE venues ADD COLUMN announceDedication tinyint(1) NOT NULL DEFAULT 1");
+ if(!in_array('logoPath',$existing,true))$d->exec("ALTER TABLE venues ADD COLUMN logoPath varchar(200) NULL");
+}
+
+/**
+ * Opens the shared bar session (Google bridge + CSRF token), used by both
+ * /bar and /tv so a login on one carries over to the other.
+ */
+function open_bar_session():void{
+ ini_set('session.use_strict_mode','1');ini_set('session.cookie_httponly','1');ini_set('session.cookie_samesite','Lax');
+ if(!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off')ini_set('session.cookie_secure','1');
+ $oauthVenue=null;
+ if(!empty($_COOKIE['tocaraul_google'])){open_session('tocaraul_google');if(isset($_SESSION['venue']))$oauthVenue=(int)$_SESSION['venue'];}
+ open_session('tocaraul_bar');
+ if($oauthVenue&&!isset($_SESSION['venue']))$_SESSION['venue']=$oauthVenue;
+ if(empty($_SESSION['csrf']))$_SESSION['csrf']=bin2hex(random_bytes(32));
+}
+
+/**
  * Registers the bar and its owner login. Single source of truth for onboarding.
- * There is no screen to pair: the panel at /bar is the player.
+ * There is no pairing code: the owner logs into /bar with code+password, and
+ * that same session opens /tv on the screen.
  */
 function onboard_venue(array $p, ?int $partnerId = null): array {
  $owner=trim((string)($p['ownerName']??''));

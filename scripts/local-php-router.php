@@ -14,8 +14,8 @@ if($path==='/favicon.ico'){header('Content-Type: image/png');readfile($root.'/as
 if($path==='/'||$path==='')require $root.'/home.php';
 elseif($path==='/admin')require $root.'/admin.php';
 elseif($path==='/bar')require $root.'/owner.php';
-elseif($path==='/player'||$path==='/tela'){header('Location: /bar',true,302);return;}
-elseif($path==='/tv'){header('Location: /bar',true,302);return;}
+elseif($path==='/tv')require $root.'/tv.php';
+elseif($path==='/player'||$path==='/tela'){header('Location: /tv',true,302);return;}
 elseif($path==='/privacy')require $root.'/privacy.php';
 elseif($path==='/parceiro')require $root.'/partner.php';
 elseif($path==='/cadastro')require $root.'/signup.php';
