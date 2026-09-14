@@ -18,6 +18,12 @@ declare(strict_types=1);require_once __DIR__.'/admin_settings.php';require_once 
 #search{font-size:20px;padding:17px 16px;border:2px solid #242424;box-shadow:inset 0 0 0 2px #fff}
 #catalog{margin-top:16px}.song{min-height:88px;padding:12px 14px}.song:after{font-size:15px;padding:9px 12px}.song.selected{background:#fff4cf}
 #toStep2{margin-top:18px}.topbar{margin-bottom:8px}
+</style><style>
+body{background:#0d0d0d;color:#fff}.logo span{color:#fff}.tablechip{text-align:left}.chip{background:#191919;color:#fff;border-color:#3a3a3a}
+.hero h1,.hero p,.field label,.muted{color:#fff}.step-dot{background:#1c1c1c;color:#fff}.step-dot.active{background:#e6b93f;color:#111;border-color:#111}.step-dot.done{color:#fff}
+#view1,.card,.song{background:#181818;color:#fff;border-color:#3b3b3b;box-shadow:4px 4px 0 #050505}#view1 .field label{color:#fff}.song.selected{background:#28220b;border-color:#e6b93f}.song span,.chosen .info span{color:#fff}.song b{color:#e6b93f}.song:after{background:#c94a40;color:#fff}
+input,textarea{background:#101010;color:#fff;border-color:#666}.btn{background:#c94a40;color:#fff;border-color:#8f2e28}.btn.ghost{background:#1b1b1b;color:#6f9bd8;border-color:#6f9bd8}.btn:disabled{background:#5a3431;color:#eee}
+.chosen{background:#202020;color:#fff;border-color:#3b3b3b}.pixbadge{background:#172522;color:#fff;border-color:#2d746b}.secure,.good{color:#6ee7d8}.bad{color:#ff9b93}.copy{background:#111;color:#fff;border-color:#555}
 </style><div class=topbar><div class=logo><img src="<?=h($barLogo)?>" alt="<?=h($name)?>"><span><?=h($name)?></span></div></div><div class=tablechip><span class=chip><?=$label?></span></div>
 <div class=hero><h1>Escolha. Pague. Tocou.</h1><p><?=$name?> · música <b id=base></b></p></div>
 <?php if(!$ready):?><p class=bad>Cobranças sandbox ainda não configuradas pelo TocaRaul.</p><?php endif;?>
