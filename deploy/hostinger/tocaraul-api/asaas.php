@@ -23,6 +23,18 @@ function asaas_api(string $method, string $path, ?array $body=null): array {
 
 function asaas_ready(): bool { return runtime_setting('asaas_api_key','ASAAS_API_KEY')!==''; }
 
+function payment_event_file(int $requestId): string { return __DIR__.'/cache/payment_'.$requestId.'.json'; }
+function payment_event_write(int $requestId, array $event): void {
+    if($requestId<=0)return;
+    $dir=__DIR__.'/cache';if(!is_dir($dir)&&!@mkdir($dir,0700,true))return;
+    $file=payment_event_file($requestId);$tmp=$file.'.'.getmypid().'.tmp';
+    if(@file_put_contents($tmp,json_encode($event,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE),LOCK_EX)!==false)@rename($tmp,$file);
+}
+function payment_event_read(int $requestId): ?array {
+    if($requestId<=0)return null;$raw=@file_get_contents(payment_event_file($requestId));
+    $event=is_string($raw)?json_decode($raw,true):null;return is_array($event)?$event:null;
+}
+
 /** Sandbox-only: asks Asaas' own sandbox to mark a Pix charge as paid. This endpoint does not exist outside sandbox. */
 function asaas_sandbox_confirm(string $externalId): array { return asaas_api('POST','/sandbox/payment/'.rawurlencode($externalId).'/confirm',[]); }
 
@@ -60,6 +72,7 @@ function asaas_reconcile(string $externalId):array {
             if($req['status']==='AWAITING_PAYMENT') {
                 $q=$d->prepare("SELECT COALESCE(MAX(queuePosition),0)+1 FROM songRequests WHERE venueId=? AND status IN ('QUEUED','PLAYING')");$q->execute([$req['venueId']]);
                 $d->prepare("UPDATE songRequests SET status='QUEUED',queuePosition=? WHERE id=?")->execute([(int)$q->fetchColumn(),$req['id']]);
+                $req['status']='QUEUED';
             }
             $gross=(int)$pay['amountCents'];$bar=(int)$req['barShareCents'];
             $q=$d->prepare("INSERT INTO financeLedger(venueId,requestId,paymentId,type,grossCents,barCents,platformCents,balanceStatus) VALUES(?,?,?,'SALE',?,?,?,?) ON DUPLICATE KEY UPDATE balanceStatus=IF(balanceStatus='AVAILABLE','AVAILABLE',VALUES(balanceStatus))");
@@ -71,6 +84,8 @@ function asaas_reconcile(string $externalId):array {
         }
         $d->commit();
         invalidate_venue_state((int)$req['venueId']);
-        return ['ok'=>true,'providerStatus'=>$state];
+        $paymentStatus=in_array($state,['RECEIVED','CONFIRMED'],true)?'APPROVED':($state==='REFUNDED'?'CANCELLED':(string)$pay['status']);
+        payment_event_write((int)$req['id'],['requestId'=>(int)$req['id'],'paymentId'=>(int)$pay['id'],'paymentStatus'=>$paymentStatus,'amountCents'=>(int)$pay['amountCents'],'requestStatus'=>(string)$req['status'],'updatedAt'=>time()]);
+        return ['ok'=>true,'providerStatus'=>$state,'requestId'=>(int)$req['id']];
     }catch(Throwable $e){$d->rollBack();throw $e;}
 }

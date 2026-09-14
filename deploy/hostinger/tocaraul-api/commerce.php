@@ -92,7 +92,7 @@ if($method==='POST'&&$path==='/api/commerce/mock-confirm'){
  if($pay['status']!=='APPROVED')asaas_sandbox_confirm((string)$pay['externalId']);
  out(asaas_reconcile((string)$pay['externalId']));
 }
-if($method==='GET'&&$path==='/api/commerce/payment'){$rid=(int)($_GET['requestId']??0);$q=db()->prepare("SELECT p.id paymentId,p.status paymentStatus,p.amountCents,r.status requestStatus FROM payments p JOIN songRequests r ON r.id=p.requestId WHERE p.requestId=? ORDER BY p.id DESC LIMIT 1");$q->execute([$rid]);$x=$q->fetch();if(!$x)out(['message'=>'Pagamento nao encontrado'],404);out($x);}
+if($method==='GET'&&$path==='/api/commerce/payment'){$rid=(int)($_GET['requestId']??0);if($event=payment_event_read($rid))out($event);$q=db()->prepare("SELECT p.id paymentId,p.status paymentStatus,p.amountCents,r.status requestStatus FROM payments p JOIN songRequests r ON r.id=p.requestId WHERE p.requestId=? ORDER BY p.id DESC LIMIT 1");$q->execute([$rid]);$x=$q->fetch();if(!$x)out(['message'=>'Pagamento nao encontrado'],404);payment_event_write($rid,['requestId'=>$rid]+$x+['updatedAt'=>time()]);out(['requestId'=>$rid]+$x);}
 if($method==='POST'&&$path==='/api/webhooks/asaas'){
  $expected=runtime_setting('asaas_webhook_token','ASAAS_WEBHOOK_TOKEN');
  if($expected===''||!hash_equals($expected,(string)($_SERVER['HTTP_ASAAS_ACCESS_TOKEN']??'')))out(['message'=>'Token inválido'],401);
