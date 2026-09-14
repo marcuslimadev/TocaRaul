@@ -79,10 +79,14 @@ function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}?><!docty
 <div class="row bh-statusrow"><span class=pill id=tvStatusPill><i id=tvDot class=dot></i><span id=tvStatusText>Verificando a TV…</span></span><span class=muted id=queueCount>0 músicas na fila</span><a class="alt" id=openTv href="/tv" target=_blank rel=noopener>⛶ Abrir tela da TV</a></div>
 </div>
 <?php if($justCreated):?><div class="c accent" style="background:var(--yellow)"><h2 style="color:var(--ink)">Bar criado!</h2><p>Use o QR Code abaixo para receber os pedidos dos clientes.</p><p class=muted>Guarde seu código <b><?=h($justCreated)?></b> e a senha: é assim que você entra neste painel.</p></div><?php endif;?>
+<div class=bh-columns>
+<div class=bh-col>
 <div class=c id=nowPlayingCard><h2>Tocando agora</h2><p><b id=nowTitle>Nenhuma música tocando</b></p><p class=muted id=nowArtist></p><p class=muted id=nowDedication></p></div>
 <div class=c><h2>Pedidos pagos — fila</h2><div id=paidList><?php if(!$paid):?><p class=muted>Nenhum pedido pago aguardando.</p><?php endif;foreach($paid as $p):?><div class="item paid"><div style="flex:1"><b><?=h($p['title'])?></b><div class=muted><?=h($p['artist'])?><?=$p['status']==='PLAYING'?' · tocando':''?></div></div></div><?php endforeach;?></div><form method=post id=banTemplate style="display:none" onsubmit="return confirm('Banir esta música no seu bar e pular agora?')"><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=song_ban><input type=hidden name=id value=0><button title="Banir esta música e pular">⛔</button></form></div>
 <div class=c><h2>Controle da tela</h2><div class=row><?php foreach(['PLAY'=>'▶ Tocar','PAUSE'=>'⏸ Pausar','SKIP'=>'⏭ Pular'] as $x=>$label):?><form method=post class=cmdForm><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=cmd><input type=hidden name=cmd value=<?=$x?>><button><?=$label?></button></form><?php endforeach;?></div><form method=post><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=announce><label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer"><input type=checkbox name=on value=1 style="width:auto" <?=!empty($v['announceDedication'])?'checked':''?> onchange="this.form.submit()"> Anunciar dedicatória com voz antes da música</label></form></div>
-<h3 class=bh-sectiondivider>Configurações</h3>
+</div>
+<div class=bh-col>
+<h3 class=bh-sectiondivider style="margin-top:0">Configurações</h3>
 <div class=c><h2>Logo do bar</h2><p class=muted>Aparece na tela enquanto a fila roda e enquanto nenhuma música toca. PNG, JPG ou WEBP de até 2 MB.</p>
 <div class=row>
 <?php if(!empty($v['logoPath'])):?><img src="<?=h($v['logoPath'])?>" alt="" style="height:72px;max-width:180px;object-fit:contain;background:#171717;border:3px solid #171717;padding:6px">
@@ -112,6 +116,8 @@ function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}?><!docty
 <?php foreach($songs as $s):?><div class="item row"><div style="flex:1"><b><?=h($s['title']?:$s['providerId'])?></b><div class=muted><?=h($s['artist']?:$s['providerId'])?></div></div><form method=post><input type=hidden name=csrf value="<?=h($_SESSION['csrf'])?>"><input type=hidden name=a value=song_del><input type=hidden name=id value=<?=(int)$s['id']?>><button>×</button></form></div><?php endforeach;?>
 </div>
 </div>
+</div><!-- /bh-col configuracoes -->
+</div><!-- /bh-columns -->
 <?php endif;?></div>
 <?php if($v):?>
 <script>

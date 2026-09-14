@@ -83,7 +83,10 @@
         mount.innerHTML = '<div class="ytmount" style="width:100%;height:100%"></div>';
         ytPlayer = new YT.Player(mount.firstChild, {
           width: '100%', height: '100%', videoId,
-          playerVars: { autoplay: 1, controls: 1, rel: 0, playsinline: 1 },
+          // fs:0 tira o botao nativo de tela cheia do YouTube (a TV ja e a tela cheia);
+          // modestbranding reduz a logo do YouTube — o resto do canto fica coberto
+          // pela lateral (dedicatoria/QR), que avança um pouco por cima do video.
+          playerVars: { autoplay: 1, controls: 1, rel: 0, playsinline: 1, fs: 0, modestbranding: 1, iv_load_policy: 3 },
           events: {
             onReady: (e) => { e.target.setVolume(voiceDone ? 100 : 18); e.target.playVideo(); armWatchdog(); },
             onStateChange: (e) => {

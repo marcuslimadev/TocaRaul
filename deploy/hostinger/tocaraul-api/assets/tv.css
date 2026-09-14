@@ -62,14 +62,18 @@ body.tv-app.cursor-hide{cursor:none}
  border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:9px 13px;font-size:15px;cursor:pointer}
 :fullscreen .tv-fs-btn{opacity:0;pointer-events:none}
 
-/* Lateral: dedicatoria em cima, QR embaixo. Sem dedicatoria, o QR cresce. */
-.tv-side{display:flex;flex-direction:column;min-width:0}
+/* Lateral: dedicatoria em cima, QR embaixo. Sem dedicatoria, o QR cresce.
+   A coluna avanca um pouco por cima do video (overlap negativo) de proposito:
+   cobre o canto onde o player do YouTube colocaria a logo/botao de tela cheia
+   nativos, que nao queremos que apareçam. */
+.tv-side{display:flex;flex-direction:column;min-width:0;position:relative;z-index:4;
+ margin-left:clamp(-56px,-4vw,-28px);width:calc(100% - clamp(-56px,-4vw,-28px));box-shadow:-18px 0 26px -14px rgba(0,0,0,.55)}
 .tv-dedication{flex:0 0 auto;max-height:62%;overflow:hidden;background:var(--yellow);color:var(--ink);display:flex;flex-direction:column;
  align-items:center;justify-content:center;text-align:center;padding:7% 6%;opacity:0;transform:translateY(-8px);transition:opacity .3s ease,transform .3s ease}
 .tv-dedication.show{opacity:1;transform:translateY(0)}
-.tv-dedication .tv-eyebrow{color:var(--ink);opacity:.65}
-.tv-dedication p{margin:0;font:900 clamp(15px,2vw,30px)/1.2 Arial;overflow-wrap:anywhere}
-.tv-dedication small{display:block;margin-top:10px;font:700 clamp(11px,1.1vw,16px) Arial;opacity:.75}
+.tv-dedication .tv-eyebrow{color:var(--ink);opacity:.7;font-size:clamp(11px,1vw,15px)}
+.tv-dedication p{margin:0;font:900 clamp(22px,3.4vw,48px)/1.18 Arial;letter-spacing:-.01em;overflow-wrap:anywhere}
+.tv-dedication small{display:block;margin-top:12px;font:700 clamp(13px,1.3vw,19px) Arial;opacity:.8}
 .tv-qr{flex:1;min-height:0;background:#fff;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3%;padding:6%}
 .tv-qr .tv-eyebrow{color:#8a8578}
 .tv-qr .code{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;width:100%}

@@ -54,6 +54,11 @@ function ensure_bar_schema():void{
  $existing=array_column($d->query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='venues'")->fetchAll(),'COLUMN_NAME');
  if(!in_array('announceDedication',$existing,true))$d->exec("ALTER TABLE venues ADD COLUMN announceDedication tinyint(1) NOT NULL DEFAULT 1");
  if(!in_array('logoPath',$existing,true))$d->exec("ALTER TABLE venues ADD COLUMN logoPath varchar(200) NULL");
+ // Marca quando um pedido pago esta sendo reaproveitado como preenchimento da
+ // fila aleatoria (historico), para a TV saber que aquela dedicatoria nao vale
+ // mais para quem esta assistindo agora.
+ $requestCols=array_column($d->query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='songRequests'")->fetchAll(),'COLUMN_NAME');
+ if($requestCols&&!in_array('isReplay',$requestCols,true))$d->exec("ALTER TABLE songRequests ADD COLUMN isReplay tinyint(1) NOT NULL DEFAULT 0");
 }
 
 /**
