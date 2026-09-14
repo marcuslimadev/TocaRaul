@@ -65,7 +65,7 @@ $qrUrl=($v&&$tables)?runtime_public_url().'/j/'.$tables[0]['qrToken']:'';
 </div>
 <button type=button id=fsBtn class=tv-fs-btn>⛶ Entrar em tela cheia</button>
 <script src="/assets/qrcode.js"></script>
-<script src="/assets/player.js?v=20260914-2"></script>
+<script src="/assets/player.js?v=20260914-3"></script>
 <script>
 const qrUrl=<?=json_encode($qrUrl,JSON_UNESCAPED_SLASHES)?>;
 if(qrUrl)new QRCode(document.getElementById('stageQr'),{text:qrUrl,width:320,height:320});
